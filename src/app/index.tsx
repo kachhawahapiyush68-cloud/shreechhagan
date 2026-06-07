@@ -6,7 +6,6 @@ import { colors } from "@/theme";
 
 export default function IndexPage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const isOnboardingCompleted = useAuthStore((s) => s.isOnboardingCompleted);
   const accessToken = useAuthStore((s) => s.accessToken);
 
   if (!hasHydrated) {
@@ -17,15 +16,13 @@ export default function IndexPage() {
     );
   }
 
-  if (!isOnboardingCompleted) {
-    return <Redirect href="/(onboarding)" />;
+  // Already logged in → go straight to home
+  if (accessToken) {
+    return <Redirect href="/(tabs)/home" />;
   }
 
-  if (!accessToken) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  return <Redirect href="/(tabs)/home" />;
+  // Not logged in → show splash first
+  return <Redirect href="/splash" />;
 }
 
 const styles = StyleSheet.create({

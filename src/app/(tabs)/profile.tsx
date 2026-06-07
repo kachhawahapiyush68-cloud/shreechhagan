@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -7,6 +8,11 @@ import { colors, spacing } from "@/theme";
 export default function ProfileRoute() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/splash");
+  };
 
   return (
     <View style={styles.root}>
@@ -26,7 +32,7 @@ export default function ProfileRoute() {
         ) : null}
 
         <View style={styles.buttonWrap}>
-          <PrimaryButton title="Logout" onPress={logout} />
+          <PrimaryButton title="Logout" onPress={handleLogout} />
         </View>
       </View>
     </View>

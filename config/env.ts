@@ -1,9 +1,11 @@
-// src/config/env.ts
-const DEV_API_URL = "http://192.168.1.22:5000"; // replace with your server/LAN IP
-const PROD_API_URL = "https://api.yourdomain.com"; // future production
+// config/env.ts
+const BASE_URL = "https://kotsuperadmin.pankhhms.com";
 
 export const ENV = {
-  API_BASE_URL: __DEV__ ? DEV_API_URL : PROD_API_URL,
+  API_BASE_URL: BASE_URL,
+  CUSTOMER_API_PATH: "/api/customer",
+  AUTH_API_PATH: "/api/auth",
   MASTER_API_PATH: "/api/master",
+  CLIENT_CODE: "KOT000001",
   REQUEST_TIMEOUT_MS: 15000,
-};
+} as const;

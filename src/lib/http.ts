@@ -21,17 +21,21 @@ export class ApiError extends Error {
   }
 }
 
-export async function postMaster<
+async function postToPath<
   TResponse,
   TPayload extends Record<string, unknown> = Record<string, unknown>,
->(body: MasterRequest<TPayload>): Promise<TResponse> {
-  const token = await getAccessToken();
+>(
+  path: string,
+  body: MasterRequest<TPayload>,
+  requireAuth = false,
+): Promise<ApiEnvelope<TResponse>> {
+  const token = requireAuth ? await getAccessToken() : null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ENV.REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${ENV.API_BASE_URL}${ENV.MASTER_API_PATH}`, {
+    const response = await fetch(`${ENV.API_BASE_URL}${path}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -43,27 +47,52 @@ export async function postMaster<
     });
 
     const json = (await response.json()) as ApiEnvelope<TResponse>;
-
-    if (!response.ok || json.Status !== 200) {
-      throw new ApiError(
-        json?.Message || "API request failed",
-        json?.Status || response.status,
-        json?.Data,
-      );
-    }
-
-    return json.Data;
+    return json;
   } catch (error: any) {
     if (error?.name === "AbortError") {
       throw new ApiError("Request timeout. Please try again.", 408);
     }
-
-    if (error instanceof ApiError) {
-      throw error;
-    }
-
+    if (error instanceof ApiError) throw error;
     throw new ApiError(error?.message || "Network request failed", 500);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** POST to /api/master — requires auth */
+export async function postMaster<
+  TResponse,
+  TPayload extends Record<string, unknown> = Record<string, unknown>,
+>(body: MasterRequest<TPayload>): Promise<TResponse> {
+  const envelope = await postToPath<TResponse, TPayload>(
+    ENV.MASTER_API_PATH,
+    body,
+    true,
+  );
+
+  if (envelope.Status !== 200) {
+    throw new ApiError(
+      envelope.Message || "API request failed",
+      envelope.Status,
+      envelope.Data,
+    );
+  }
+
+  return envelope.Data;
+}
+
+/** POST to /api/customer — returns full envelope so caller can inspect Status */
+export async function postCustomer<
+  TResponse,
+  TPayload extends Record<string, unknown> = Record<string, unknown>,
+>(body: MasterRequest<TPayload>): Promise<ApiEnvelope<TResponse>> {
+  return postToPath<TResponse, TPayload>(ENV.CUSTOMER_API_PATH, body, false);
+}
+
+/** POST to /api/auth — returns full envelope so caller can inspect Status */
+export async function postAuth<
+  TResponse,
+  TPayload extends Record<string, unknown> = Record<string, unknown>,
+>(body: MasterRequest<TPayload>): Promise<ApiEnvelope<TResponse>> {
+  return postToPath<TResponse, TPayload>(ENV.AUTH_API_PATH, body, false);
 }

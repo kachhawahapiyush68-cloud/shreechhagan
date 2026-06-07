@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "995059112666",
+    "project_id": "chaganlal-a262a",
+    "storage_bucket": "chaganlal-a262a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:995059112666:android:5cc05c7278a9d3e16963e3",
+        "android_client_info": {
+          "package_name": "com.shreechaganlal.sweets"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3dWF0TBoQncKRxw9DHXTWdl4tK-v95S8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
