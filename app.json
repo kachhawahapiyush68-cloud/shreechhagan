@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "platforms": ["android", "ios"],
-    "icon": "./src/assets/images/icon.png",
+    "icon": "./src/assets/images/shre.png",
     "scheme": "shreechhagan",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,10 +13,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/images/android-icon-foreground.png",
-        "backgroundImage": "./src/assets/images/android-icon-background.png",
-        "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./src/assets/images/shre.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.shreechaganlal.sweets",
@@ -27,14 +25,27 @@
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/splash-icon.png",
+          "image": "./src/assets/images/shre.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
       "expo-secure-store",
       "expo-image",
-      ["expo-notifications", { "color": "#FC8019" }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Shree Chhagan to access your photos to update your profile picture.",
+          "cameraPermission": "Allow Shree Chhagan to access your camera to take your profile photo.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FC8019"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

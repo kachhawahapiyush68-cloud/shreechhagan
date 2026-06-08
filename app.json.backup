@@ -48,3 +48,68 @@
     }
   }
 }
+
+
+
+
+
+
+second time 
+
+
+{
+  "expo": {
+    "name": "shreeChhagan",
+    "slug": "shreeChhagan",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["android", "ios"],
+    "icon": "./src/assets/images/icon.png",
+    "scheme": "shreechhagan",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./src/assets/images/android-icon-foreground.png",
+        "backgroundImage": "./src/assets/images/android-icon-background.png",
+        "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.shreechaganlal.sweets",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./src/assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-secure-store",
+      "expo-image",
+      ["expo-notifications", { "color": "#FC8019" }]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "70700a2a-6e11-41ac-b521-6477e4a040ab"
+      }
+    }
+  }
+}
+
+
+
+
+
+
+

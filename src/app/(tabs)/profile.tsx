@@ -1,98 +1,36 @@
-// import { router } from "expo-router";
-// import { StyleSheet, Text, View } from "react-native";
-
-// import { PrimaryButton } from "@/components/ui/primary-button";
-// import { useAuthStore } from "@/features/auth/store/auth.store";
-// import { colors, spacing } from "@/theme";
-
-// export default function ProfileRoute() {
-//   const user = useAuthStore((s) => s.user);
-//   const logout = useAuthStore((s) => s.logout);
-
-//   const handleLogout = async () => {
-//     await logout();
-//     router.replace("/splash");
-//   };
-
-//   return (
-//     <View style={styles.root}>
-//       <View style={styles.card}>
-//         <Text style={styles.title}>Profile</Text>
-//         <Text style={styles.label}>Name</Text>
-//         <Text style={styles.value}>{user?.fullName ?? "Guest"}</Text>
-
-//         <Text style={styles.label}>Phone</Text>
-//         <Text style={styles.value}>{user?.phone ?? "-"}</Text>
-
-//         {user?.email ? (
-//           <>
-//             <Text style={styles.label}>Email</Text>
-//             <Text style={styles.value}>{user.email}</Text>
-//           </>
-//         ) : null}
-
-//         <View style={styles.buttonWrap}>
-//           <PrimaryButton title="Logout" onPress={handleLogout} />
-//         </View>
-//       </View>
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   root: {
-//     flex: 1,
-//     backgroundColor: colors.light.background,
-//     alignItems: "center",
-//     justifyContent: "center",
-//     paddingHorizontal: spacing.lg,
-//   },
-//   card: {
-//     width: "100%",
-//     borderRadius: 16,
-//     backgroundColor: colors.light.surface,
-//     padding: spacing["2xl"],
-//   },
-//   title: {
-//     fontSize: 22,
-//     fontWeight: "800",
-//     marginBottom: spacing.lg,
-//     color: colors.light.text,
-//   },
-//   label: {
-//     marginTop: spacing.sm,
-//     fontSize: 13,
-//     color: colors.light.textSecondary,
-//   },
-//   value: {
-//     fontSize: 15,
-//     fontWeight: "600",
-//     color: colors.light.text,
-//   },
-//   buttonWrap: {
-//     marginTop: spacing["2xl"],
-//   },
-// });
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AddressFormScreen } from "@/features/address/screens/address-form-screen";
 import { AddressListScreen } from "@/features/address/screens/address-list-screen";
+import { updateCustomerProfile } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { radius, spacing, useTheme } from "@/theme";
 import type { AddressDto } from "@/types/api";
 
 type ProfileSection = "main" | "addresses";
+
+function sanitizePhone(value: string) {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function toDataUri(base64: string, mimeType = "image/jpeg") {
+  return `data:${mimeType};base64,${base64}`;
+}
 
 export default function ProfileTab() {
   const { colors } = useTheme();
@@ -100,10 +38,24 @@ export default function ProfileTab() {
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const updateUser = useAuthStore((s) => s.updateUser);
 
   const [section, setSection] = useState<ProfileSection>("main");
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editAddress, setEditAddress] = useState<AddressDto | null>(null);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [fullName, setFullName] = useState(user?.fullName ?? "");
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  const displayPhoto = user?.photoLocalUri || user?.photoUrl || null;
+
+  const initial = useMemo(
+    () => user?.fullName?.charAt(0)?.toUpperCase() ?? "U",
+    [user?.fullName],
+  );
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to sign out?", [
@@ -124,6 +76,156 @@ export default function ProfileTab() {
   const handleAddressFormSuccess = () => {
     setShowAddressForm(false);
     setEditAddress(null);
+  };
+
+  const resetProfileForm = () => {
+    setFullName(user?.fullName ?? "");
+    setPhone(user?.phone ?? "");
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = async (imagePayload?: {
+    customerImageBase64?: string | null;
+    customerPhotoName?: string | null;
+    previewUri?: string | null;
+  }) => {
+    if (!user?.id) {
+      Alert.alert("Error", "User session not found.");
+      return;
+    }
+
+    const trimmedName = fullName.trim();
+    const cleanedPhone = sanitizePhone(phone);
+
+    if (!trimmedName) {
+      Alert.alert("Validation", "Please enter your full name.");
+      return;
+    }
+
+    if (cleanedPhone.length !== 10) {
+      Alert.alert("Validation", "Please enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    try {
+      setSavingProfile(true);
+
+      const res = await updateCustomerProfile({
+        customerId: Number(user.id),
+        customerName: trimmedName,
+        customerMobile: cleanedPhone,
+        customerImageBase64: imagePayload?.customerImageBase64 ?? undefined,
+        customerPhotoName: imagePayload?.customerPhotoName ?? undefined,
+      });
+
+      const item = Array.isArray(res.Data) ? res.Data[0] : undefined;
+
+      if (res.Status !== 200 || !item?.Success) {
+        throw new Error(
+          item?.Message || res.Message || "Profile update failed",
+        );
+      }
+
+      updateUser({
+        fullName: item.CustomerName,
+        phone: item.CustomerMobile,
+        photoUrl: item.CustomerPhotoUrl || user.photoUrl,
+        photoName: item.CustomerPhotoName || user.photoName,
+        ...(imagePayload?.previewUri
+          ? { photoLocalUri: imagePayload.previewUri }
+          : {}),
+      });
+
+      setIsEditingProfile(false);
+      Alert.alert("Success", "Profile updated successfully.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update profile.";
+      Alert.alert("Update failed", message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const pickAndUploadPhoto = async (fromCamera: boolean) => {
+    try {
+      setPhotoBusy(true);
+
+      const permission = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          fromCamera
+            ? "Camera permission is required."
+            : "Photo library permission is required.",
+        );
+        return;
+      }
+
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+            base64: true,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+            base64: true,
+          });
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      if (!asset.base64) {
+        throw new Error("Image base64 data not available.");
+      }
+
+      const mimeType = asset.mimeType || "image/jpeg";
+      const fileName =
+        asset.fileName ||
+        `profile-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
+
+      await handleSaveProfile({
+        customerImageBase64: toDataUri(asset.base64, mimeType),
+        customerPhotoName: fileName,
+        previewUri: asset.uri,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update photo.";
+      Alert.alert("Photo update failed", message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const handlePhotoOptions = () => {
+    Alert.alert("Profile photo", "Choose an option", [
+      {
+        text: "Take photo",
+        onPress: () => {
+          void pickAndUploadPhoto(true);
+        },
+      },
+      {
+        text: "Choose from gallery",
+        onPress: () => {
+          void pickAndUploadPhoto(false);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   return (
@@ -150,19 +252,56 @@ export default function ProfileTab() {
           <View
             style={[
               styles.avatarCard,
-              { backgroundColor: colors.surface, shadowColor: colors.black },
+              {
+                backgroundColor: colors.surface,
+                shadowColor: colors.black,
+                borderColor: colors.border,
+              },
             ]}
           >
-            <View
-              style={[
-                styles.avatarCircle,
-                { backgroundColor: colors.surfaceSecondary },
-              ]}
+            <Pressable
+              onPress={handlePhotoOptions}
+              style={styles.avatarWrap}
+              disabled={photoBusy || savingProfile}
             >
-              <Text style={[styles.avatarInitial, { color: colors.primary }]}>
-                {user?.fullName?.charAt(0)?.toUpperCase() ?? "U"}
-              </Text>
-            </View>
+              <View
+                style={[
+                  styles.avatarCircle,
+                  { backgroundColor: colors.surfaceSecondary },
+                ]}
+              >
+                {displayPhoto ? (
+                  <Image
+                    source={{ uri: displayPhoto }}
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text
+                    style={[styles.avatarInitial, { color: colors.primary }]}
+                  >
+                    {initial}
+                  </Text>
+                )}
+
+                <View
+                  style={[
+                    styles.cameraBadge,
+                    {
+                      backgroundColor: colors.primary,
+                      borderColor: colors.surface,
+                    },
+                  ]}
+                >
+                  {photoBusy ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="camera" size={14} color={colors.white} />
+                  )}
+                </View>
+              </View>
+            </Pressable>
+
             <View style={styles.avatarInfo}>
               <Text style={[styles.avatarName, { color: colors.text }]}>
                 {user?.fullName ?? "User"}
@@ -177,8 +316,104 @@ export default function ProfileTab() {
                   {user.email}
                 </Text>
               ) : null}
+
+              <Pressable onPress={() => setIsEditingProfile(true)}>
+                <Text style={[styles.editLink, { color: colors.primary }]}>
+                  Edit profile
+                </Text>
+              </Pressable>
             </View>
           </View>
+
+          {isEditingProfile ? (
+            <View
+              style={[
+                styles.editCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.formLabel, { color: colors.text }]}>
+                Full name
+              </Text>
+              <TextInput
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Enter full name"
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.input,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.background,
+                  },
+                ]}
+              />
+
+              <Text style={[styles.formLabel, { color: colors.text }]}>
+                Mobile number
+              </Text>
+              <TextInput
+                value={phone}
+                onChangeText={(text) => setPhone(sanitizePhone(text))}
+                placeholder="Enter mobile number"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                maxLength={10}
+                style={[
+                  styles.input,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.background,
+                  },
+                ]}
+              />
+
+              <View style={styles.editActions}>
+                <Pressable
+                  onPress={resetProfileForm}
+                  style={[
+                    styles.secondaryBtn,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                  disabled={savingProfile}
+                >
+                  <Text
+                    style={[styles.secondaryBtnText, { color: colors.text }]}
+                  >
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => void handleSaveProfile()}
+                  style={[
+                    styles.primaryBtn,
+                    { backgroundColor: colors.primary },
+                    savingProfile && styles.btnDisabled,
+                  ]}
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <Text
+                      style={[styles.primaryBtnText, { color: colors.white }]}
+                    >
+                      Save
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.menuSection}>
             <Text
@@ -359,19 +594,89 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 12,
     elevation: 3,
+    borderWidth: 1,
+  },
+  avatarWrap: {
+    position: "relative",
   },
   avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  avatarInitial: { fontSize: 24, fontWeight: "800" },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarInitial: { fontSize: 28, fontWeight: "800" },
+  cameraBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
   avatarInfo: { flex: 1, gap: 2 },
   avatarName: { fontSize: 17, fontWeight: "700" },
   avatarPhone: { fontSize: 14 },
   avatarEmail: { fontSize: 12 },
+  editLink: { fontSize: 13, fontWeight: "700", marginTop: 6 },
+  editCard: {
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  formLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: spacing.xs,
+  },
+  input: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+  },
+  editActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  secondaryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  secondaryBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  primaryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  btnDisabled: {
+    opacity: 0.7,
+  },
   menuSection: { gap: spacing.xs },
   menuSectionLabel: {
     fontSize: 12,
@@ -398,6 +703,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderBottomWidth: 1,
   },
-  backBtn: { padding: spacing.xxs },
+  backBtn: { padding: 4 },
   subHeaderTitle: { fontSize: 17, fontWeight: "700" },
 });

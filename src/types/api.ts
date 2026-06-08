@@ -1,100 +1,3 @@
-// // src/types/api.ts
-
-// export type ApiEnvelope<T> = {
-//   Status: number;
-//   Message: string;
-//   Data: T;
-// };
-
-// export type MasterAction =
-//   | "GET_PRODUCTS"
-//   | "GET_CATEGORIES"
-//   | "GET_SPLASH_SCREEN"
-//   | "CUSTOMER_LOGIN"
-//   | "REGISTER_CUSTOMER"
-//   | "SEND_OTP"
-//   | "OTP_VERIFY";
-
-// // ─── Existing DTOs ───────────────────────────────────────────────────────────
-
-// export type CategoryDto = {
-//   CategoryId: number;
-//   CategoryName: string;
-//   IsActive?: boolean;
-//   ImageUrl?: string | null;
-// };
-
-// export type ProductDto = {
-//   ProductId: number;
-//   CategoryId: number;
-//   CategoryName: string;
-//   ProductName: string;
-//   Price: number;
-//   TaxPercent: number;
-//   IsActive: boolean;
-//   Description?: string | null;
-//   ImageUrl?: string | null;
-// };
-
-// // ─── Auth DTOs ────────────────────────────────────────────────────────────────
-
-// export type SplashBannerDto = {
-//   BannerId: number;
-//   BannerImagePath: string;
-//   BannerImageUrl: string;
-//   ImageType: number;
-//   DisplayOrder: number;
-//   IsActive: boolean;
-//   CreatedAt: string;
-// };
-
-// export type CustomerLoginDto = {
-//   Success: number;
-//   Message: string;
-//   CustomerId: number;
-//   CustomerName: string;
-//   CustomerMobile: string;
-//   customeremail: string;
-//   CustomerImageBase64: string;
-//   FcmToken: string;
-//   OtpVerified: boolean;
-//   IsActive: boolean;
-//   token: string;
-//   Token: string;
-//   ClientCode: string;
-//   fcm_token: string;
-// };
-
-// export type RegisterCustomerDto = {
-//   Success: number;
-//   Message: string;
-//   CustomerId: number;
-//   CustomerName: string;
-//   CustomerMobile: string;
-//   customeremail: string;
-//   OtpVerified: boolean;
-//   IsActive: boolean;
-// };
-
-// export type SendOtpDto = {
-//   NotificationSent: boolean;
-//   NotificationStatus: string;
-// };
-
-// export type OtpVerifyDto = {
-//   Success: number;
-//   Message: string;
-//   CustomerId: number;
-//   CustomerName: string;
-//   CustomerMobile: string;
-//   customeremail: string;
-//   CustomerImageBase64?: string;
-//   OtpVerified: boolean;
-//   IsActive: boolean;
-//   token: string;
-//   Token: string;
-//   ClientCode: string;
-// };
 export type ApiEnvelope<T> = {
   Status: number;
   Message: string;
@@ -138,6 +41,10 @@ export type ProductDto = {
   IsActive: boolean;
   Description?: string | null;
   ImageUrl?: string | null;
+  Rating?: number | null;
+  AvgRating?: number | null;
+  ReviewCount?: number | null;
+  TotalReviews?: number | null;
 };
 
 export type SplashBannerDto = {
@@ -156,9 +63,12 @@ export type CustomerLoginDto = {
   CustomerId: number;
   CustomerName: string;
   CustomerMobile: string;
-  customeremail?: string;
-  CustomerEmail?: string;
-  CustomerImageBase64?: string;
+  customeremail?: string | null;
+  CustomerEmail?: string | null;
+  CustomerImageBase64?: string | null;
+  CustomerPhotoPath?: string | null;
+  CustomerPhotoUrl?: string | null;
+  CustomerPhotoName?: string | null;
   FcmToken?: string;
   OtpVerified: boolean;
   IsActive: boolean;
@@ -174,8 +84,8 @@ export type RegisterCustomerDto = {
   CustomerId: number;
   CustomerName: string;
   CustomerMobile: string;
-  customeremail?: string;
-  CustomerEmail?: string;
+  customeremail?: string | null;
+  CustomerEmail?: string | null;
   OtpVerified: boolean;
   IsActive: boolean;
 };
@@ -191,14 +101,31 @@ export type OtpVerifyDto = {
   CustomerId: number;
   CustomerName: string;
   CustomerMobile: string;
-  customeremail?: string;
-  CustomerEmail?: string;
-  CustomerImageBase64?: string;
+  customeremail?: string | null;
+  CustomerEmail?: string | null;
+  CustomerImageBase64?: string | null;
+  CustomerPhotoPath?: string | null;
+  CustomerPhotoUrl?: string | null;
+  CustomerPhotoName?: string | null;
   OtpVerified: boolean;
   IsActive: boolean;
   token?: string;
   Token?: string;
   ClientCode?: string;
+};
+
+export type UpdateCustomerProfileDto = {
+  Success: number;
+  Message: string;
+  CustomerId: number;
+  CustomerName: string;
+  CustomerMobile: string;
+  customeremail?: string | null;
+  CustomerPhotoPath?: string | null;
+  OtpVerified: boolean;
+  IsActive: boolean;
+  CustomerPhotoUrl?: string | null;
+  CustomerPhotoName?: string | null;
 };
 
 export type AddressDto = {
@@ -246,6 +173,9 @@ export type AuthSessionUser = {
   phone: string;
   email?: string;
   clientCode?: string;
+  photoUrl?: string;
+  photoName?: string;
+  photoLocalUri?: string;
 };
 
 export type AuthSession = {
@@ -254,9 +184,22 @@ export type AuthSession = {
 };
 
 export function getCustomerEmail(
-  dto: Partial<CustomerLoginDto & OtpVerifyDto & RegisterCustomerDto>,
+  dto: Partial<
+    | CustomerLoginDto
+    | OtpVerifyDto
+    | RegisterCustomerDto
+    | UpdateCustomerProfileDto
+  >,
 ) {
-  return dto.customeremail || dto.CustomerEmail || "";
+  if ("CustomerEmail" in dto && typeof dto.CustomerEmail === "string") {
+    return dto.CustomerEmail;
+  }
+
+  if ("customeremail" in dto && typeof dto.customeremail === "string") {
+    return dto.customeremail;
+  }
+
+  return "";
 }
 
 export function getCustomerToken(

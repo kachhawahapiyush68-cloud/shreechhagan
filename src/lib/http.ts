@@ -1,101 +1,3 @@
-// // src/lib/http.ts
-// import { getAccessToken } from "@/lib/secure-storage";
-// import type { ApiEnvelope, MasterAction } from "@/types/api";
-// import { ENV } from "../../config/env";
-
-// type MasterRequest<
-//   TPayload extends Record<string, unknown> = Record<string, unknown>,
-// > = {
-//   Action: MasterAction;
-//   Payload: TPayload;
-// };
-
-// export class ApiError extends Error {
-//   status: number;
-//   data?: unknown;
-
-//   constructor(message: string, status = 500, data?: unknown) {
-//     super(message);
-//     this.status = status;
-//     this.data = data;
-//   }
-// }
-
-// async function postToPath<
-//   TResponse,
-//   TPayload extends Record<string, unknown> = Record<string, unknown>,
-// >(
-//   path: string,
-//   body: MasterRequest<TPayload>,
-//   requireAuth = false,
-// ): Promise<ApiEnvelope<TResponse>> {
-//   const token = requireAuth ? await getAccessToken() : null;
-
-//   const controller = new AbortController();
-//   const timer = setTimeout(() => controller.abort(), ENV.REQUEST_TIMEOUT_MS);
-
-//   try {
-//     const response = await fetch(`${ENV.API_BASE_URL}${path}`, {
-//       method: "POST",
-//       headers: {
-//         Accept: "application/json",
-//         "Content-Type": "application/json",
-//         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//       },
-//       body: JSON.stringify(body),
-//       signal: controller.signal,
-//     });
-
-//     const json = (await response.json()) as ApiEnvelope<TResponse>;
-//     return json;
-//   } catch (error: any) {
-//     if (error?.name === "AbortError") {
-//       throw new ApiError("Request timeout. Please try again.", 408);
-//     }
-//     if (error instanceof ApiError) throw error;
-//     throw new ApiError(error?.message || "Network request failed", 500);
-//   } finally {
-//     clearTimeout(timer);
-//   }
-// }
-
-// /** POST to /api/master — requires auth */
-// export async function postMaster<
-//   TResponse,
-//   TPayload extends Record<string, unknown> = Record<string, unknown>,
-// >(body: MasterRequest<TPayload>): Promise<TResponse> {
-//   const envelope = await postToPath<TResponse, TPayload>(
-//     ENV.MASTER_API_PATH,
-//     body,
-//     true,
-//   );
-
-//   if (envelope.Status !== 200) {
-//     throw new ApiError(
-//       envelope.Message || "API request failed",
-//       envelope.Status,
-//       envelope.Data,
-//     );
-//   }
-
-//   return envelope.Data;
-// }
-
-// /** POST to /api/customer — returns full envelope so caller can inspect Status */
-// export async function postCustomer<
-//   TResponse,
-//   TPayload extends Record<string, unknown> = Record<string, unknown>,
-// >(body: MasterRequest<TPayload>): Promise<ApiEnvelope<TResponse>> {
-//   return postToPath<TResponse, TPayload>(ENV.CUSTOMER_API_PATH, body, false);
-// }
-
-// /** POST to /api/auth — returns full envelope so caller can inspect Status */
-// export async function postAuth<
-//   TResponse,
-//   TPayload extends Record<string, unknown> = Record<string, unknown>,
-// >(body: MasterRequest<TPayload>): Promise<ApiEnvelope<TResponse>> {
-//   return postToPath<TResponse, TPayload>(ENV.AUTH_API_PATH, body, false);
-// }
 import { getAccessToken } from "@/lib/secure-storage";
 import type { ApiEnvelope, ApiRequestAction } from "@/types/api";
 import { ENV } from "../../config/env";
@@ -124,39 +26,8 @@ export class ApiError extends Error {
   }
 }
 
-async function parseResponseSafely<TResponse>(
-  response: Response,
-): Promise<ApiEnvelope<TResponse>> {
-  const contentType = response.headers.get("content-type") ?? "";
-  const isJson = contentType.toLowerCase().includes("application/json");
-  const rawText = await response.text();
-
-  if (!rawText) {
-    throw new ApiError("Empty response received from server", response.status);
-  }
-
-  if (!isJson) {
-    throw new ApiError(
-      "Unexpected server response format",
-      response.status,
-      rawText,
-      "INVALID_CONTENT_TYPE",
-    );
-  }
-
-  try {
-    return JSON.parse(rawText) as ApiEnvelope<TResponse>;
-  } catch {
-    throw new ApiError(
-      "Failed to parse server response",
-      response.status,
-      rawText,
-      "INVALID_JSON",
-    );
-  }
-}
-
 function getDefaultErrorMessage(status: number) {
+  if (status === 400) return "Invalid request. Please check your input.";
   if (status === 401) return "Session expired. Please log in again.";
   if (status === 403) return "You do not have access to this action.";
   if (status === 404) return "Requested resource was not found.";
@@ -165,15 +36,46 @@ function getDefaultErrorMessage(status: number) {
   return "Something went wrong. Please try again.";
 }
 
-async function postToPath<
-  TResponse,
-  TPayload extends ApiPayload = ApiPayload,
-  TAction extends ApiRequestAction = ApiRequestAction,
->(
-  path: string,
-  body: ApiRequest<TPayload, TAction>,
+function tryParseJson<T>(value: string): T | null {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function parseEnvelopeResponse<TResponse>(
+  response: Response,
+): Promise<ApiEnvelope<TResponse>> {
+  const rawText = await response.text();
+  const parsed = rawText ? tryParseJson<ApiEnvelope<TResponse>>(rawText) : null;
+
+  if (parsed) {
+    return parsed;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  throw new ApiError(
+    contentType.toLowerCase().includes("text/html")
+      ? "Server returned HTML instead of JSON. Please verify the API path."
+      : "Unexpected server response format",
+    response.status,
+    {
+      rawText,
+      contentType,
+      url: response.url,
+    },
+    "INVALID_RESPONSE_FORMAT",
+  );
+}
+
+async function requestJson<TResponse>(
+  url: string,
+  body: unknown,
   options?: {
     requireAuth?: boolean;
+    headers?: Record<string, string>;
   },
 ): Promise<ApiEnvelope<TResponse>> {
   const requireAuth = options?.requireAuth ?? false;
@@ -183,18 +85,19 @@ async function postToPath<
   const timer = setTimeout(() => controller.abort(), ENV.REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${ENV.API_BASE_URL}${path}`, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options?.headers ?? {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
 
-    const envelope = await parseResponseSafely<TResponse>(response);
+    const envelope = await parseEnvelopeResponse<TResponse>(response);
 
     if (!response.ok) {
       throw new ApiError(
@@ -225,6 +128,105 @@ async function postToPath<
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function requestFormData<TResponse>(
+  url: string,
+  formData: FormData,
+  options?: {
+    requireAuth?: boolean;
+    headers?: Record<string, string>;
+  },
+): Promise<ApiEnvelope<TResponse>> {
+  const requireAuth = options?.requireAuth ?? false;
+  const token = requireAuth ? await getAccessToken() : null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ENV.REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options?.headers ?? {}),
+      },
+      body: formData,
+      signal: controller.signal,
+    });
+
+    const envelope = await parseEnvelopeResponse<TResponse>(response);
+
+    if (!response.ok) {
+      throw new ApiError(
+        envelope.Message || getDefaultErrorMessage(response.status),
+        response.status,
+        envelope.Data,
+      );
+    }
+
+    return envelope;
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      error.name === "AbortError"
+    ) {
+      throw new ApiError("Request timeout. Please try again.", 408);
+    }
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Network request failed";
+    throw new ApiError(message, 500);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function postToPath<
+  TResponse,
+  TPayload extends ApiPayload = ApiPayload,
+  TAction extends ApiRequestAction = ApiRequestAction,
+>(
+  path: string,
+  body: ApiRequest<TPayload, TAction>,
+  options?: {
+    requireAuth?: boolean;
+  },
+): Promise<ApiEnvelope<TResponse>> {
+  return requestJson<TResponse>(`${ENV.API_BASE_URL}${path}`, body, options);
+}
+
+export async function postApiPath<TResponse, TBody = Record<string, unknown>>(
+  path: string,
+  body: TBody,
+  options?: {
+    requireAuth?: boolean;
+    headers?: Record<string, string>;
+  },
+): Promise<ApiEnvelope<TResponse>> {
+  return requestJson<TResponse>(`${ENV.API_BASE_URL}${path}`, body, options);
+}
+
+export async function postMultipartPath<TResponse>(
+  path: string,
+  formData: FormData,
+  options?: {
+    requireAuth?: boolean;
+    headers?: Record<string, string>;
+  },
+): Promise<ApiEnvelope<TResponse>> {
+  return requestFormData<TResponse>(
+    `${ENV.API_BASE_URL}${path}`,
+    formData,
+    options,
+  );
 }
 
 export async function postMaster<
