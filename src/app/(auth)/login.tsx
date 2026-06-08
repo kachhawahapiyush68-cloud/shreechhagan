@@ -1,10 +1,13 @@
 // import { loginCustomer, sendOtp } from "@/features/auth/api/auth.api";
-// import { colors, radius, spacing } from "@/theme";
+// import { radius, spacing, useTheme } from "@/theme";
+// import { Image } from "expo-image";
 // import { router } from "expo-router";
+// import { StatusBar } from "expo-status-bar";
 // import { useRef, useState } from "react";
 // import {
 //   ActivityIndicator,
 //   Animated,
+//   Dimensions,
 //   KeyboardAvoidingView,
 //   Platform,
 //   Pressable,
@@ -16,14 +19,47 @@
 // } from "react-native";
 // import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// const { height: SCREEN_H } = Dimensions.get("window");
+// const HERO_H = Math.round(SCREEN_H * 0.4);
+// const MOBILE_LENGTH = 10;
+
+// function sanitizePhone(value: string) {
+//   return value.replace(/\D/g, "").slice(0, MOBILE_LENGTH);
+// }
+
+// // Pulls an HTTP status out of either a thrown error or a response-like object,
+// // no matter how your http client shapes it.
+// function extractStatus(source: unknown): number | undefined {
+//   if (source && typeof source === "object") {
+//     const obj = source as Record<string, any>;
+//     const candidates = [
+//       obj.status,
+//       obj.statusCode,
+//       obj.Status,
+//       obj.response?.status,
+//       obj.response?.Status,
+//       obj.data?.Status,
+//     ];
+//     for (const c of candidates) {
+//       if (typeof c === "number") return c;
+//     }
+//     const msg = typeof obj.message === "string" ? obj.message : "";
+//     const match = msg.match(/\b(401|404)\b/);
+//     if (match) return Number(match[1]);
+//   }
+//   return undefined;
+// }
+
 // export default function LoginRoute() {
 //   const insets = useSafeAreaInsets();
+//   const { colors } = useTheme();
+
 //   const [phone, setPhone] = useState("");
 //   const [loading, setLoading] = useState(false);
 //   const [error, setError] = useState("");
 
 //   const shakeAnim = useRef(new Animated.Value(0)).current;
-//   const inputScale = useRef(new Animated.Value(1)).current;
+//   const cleanedPhone = sanitizePhone(phone);
 
 //   const shake = () => {
 //     Animated.sequence([
@@ -55,287 +91,237 @@
 //     ]).start();
 //   };
 
-//   const handleFocus = () => {
-//     Animated.spring(inputScale, {
-//       toValue: 1.02,
-//       useNativeDriver: true,
-//       damping: 15,
-//       stiffness: 200,
-//     }).start();
+//   const goToRegister = () => {
+//     router.push({
+//       pathname: "/(auth)/register",
+//       params: { phone: cleanedPhone },
+//     });
 //   };
 
-//   const handleBlur = () => {
-//     Animated.spring(inputScale, {
-//       toValue: 1,
-//       useNativeDriver: true,
-//       damping: 15,
-//       stiffness: 200,
-//     }).start();
-//   };
-
-//   const handleContinue = async () => {
-//     const cleaned = phone.replace(/\D/g, "");
-//     if (cleaned.length < 10) {
+//   const handleLogin = async () => {
+//     if (cleanedPhone.length < MOBILE_LENGTH) {
 //       setError("Please enter a valid 10-digit mobile number");
 //       shake();
 //       return;
 //     }
+
 //     setError("");
 //     setLoading(true);
 
 //     try {
-//       const res = await loginCustomer(cleaned);
-
-//       // See exactly what the backend returns so you know which branch fires.
+//       const res = await loginCustomer(cleanedPhone);
 //       if (__DEV__) console.log("LOGIN RES →", JSON.stringify(res));
 
-//       if (res.Status === 200) {
-//         // Existing user. Send OTP, but DON'T let a send failure block
-//         // navigation — the OTP screen has its own "Resend OTP" button.
+//       // Existing user (account data came back) → send OTP and verify.
+//       const isExistingUser =
+//         res.Status === 200 && Array.isArray(res.Data) && res.Data.length > 0;
+
+//       if (isExistingUser) {
 //         try {
-//           await sendOtp(cleaned);
-//         } catch (e) {
-//           if (__DEV__) console.warn("sendOtp failed (continuing to OTP):", e);
+//           await sendOtp(cleanedPhone);
+//         } catch {
+//           // Continue to OTP even if resend trigger fails.
 //         }
 //         router.push({
 //           pathname: "/(auth)/otp",
-//           params: { phone: cleaned, mode: "login" },
+//           params: { phone: cleanedPhone, mode: "login" },
 //         });
-//       } else if (res.Status === 401) {
-//         // Not registered → registration screen
-//         router.push({
-//           pathname: "/(auth)/register",
-//           params: { phone: cleaned },
-//         });
-//       } else {
-//         setError(res.Message || "Something went wrong. Please try again.");
-//         shake();
+//         return;
 //       }
-//     } catch (err: any) {
-//       setError(err?.message || "Network error. Check your connection.");
+
+//       const status = extractStatus(res);
+
+//       // Number not registered → register screen.
+//       if (status === 401 || status === 404 || res.Status === 200) {
+//         goToRegister();
+//         return;
+//       }
+
+//       // Anything else is a real error.
+//       setError(res.Message || "Something went wrong. Please try again.");
+//       shake();
+//     } catch (err: unknown) {
+//       if (__DEV__) console.log("LOGIN ERR →", JSON.stringify(err), err);
+
+//       const status = extractStatus(err);
+
+//       // Thrown 401/404 from the http client → number not registered → register.
+//       if (status === 401 || status === 404) {
+//         goToRegister();
+//         return;
+//       }
+
+//       const message =
+//         err instanceof Error
+//           ? err.message
+//           : "Network error. Check your connection.";
+//       setError(message);
 //       shake();
 //     } finally {
 //       setLoading(false);
 //     }
 //   };
 
-//   const isPhoneComplete = phone.replace(/\D/g, "").length === 10;
-
 //   return (
 //     <KeyboardAvoidingView
-//       style={styles.root}
+//       style={[styles.root, { backgroundColor: colors.surface }]}
 //       behavior={Platform.OS === "ios" ? "padding" : undefined}
 //     >
+//       <StatusBar style="light" />
+//       <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+
 //       <ScrollView
-//         contentContainerStyle={[
-//           styles.scroll,
-//           { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
-//         ]}
+//         contentContainerStyle={styles.scroll}
 //         keyboardShouldPersistTaps="handled"
 //         showsVerticalScrollIndicator={false}
+//         bounces={false}
 //       >
-//         <View style={styles.header}>
-//           <View style={styles.iconBadge}>
-//             <Text style={styles.iconEmoji}>📱</Text>
-//           </View>
-//           <Text style={styles.title}>Welcome back!</Text>
-//           <Text style={styles.subtitle}>
-//             Enter your mobile number to sign in or create your account.
-//           </Text>
+//         <View style={[styles.hero, { height: HERO_H }]}>
+//           {/* TODO: swap logo.png for the donut hero photo from the design */}
+//           <Image
+//             source={require("../../assets/images/logo.png")}
+//             style={styles.heroImage}
+//             contentFit="contain"
+//           />
 //         </View>
 
-//         <View style={styles.card}>
-//           <Text style={styles.label}>Mobile Number</Text>
+//         <View
+//           style={[
+//             styles.panel,
+//             {
+//               backgroundColor: colors.surfaceSecondary,
+//               paddingBottom: insets.bottom + spacing.xl,
+//             },
+//           ]}
+//         >
+//           <Text style={[styles.title, { color: colors.text }]}>Login</Text>
+
+//           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+//             Welcome to ShreeChhagan, please login to your account using your
+//             mobile number
+//           </Text>
 
 //           <Animated.View
 //             style={[
 //               styles.inputWrap,
-//               { transform: [{ translateX: shakeAnim }, { scale: inputScale }] },
-//               error ? styles.inputWrapError : null,
+//               {
+//                 backgroundColor: colors.surface,
+//                 borderColor: error ? colors.error : "transparent",
+//                 shadowColor: colors.black,
+//                 transform: [{ translateX: shakeAnim }],
+//               },
 //             ]}
 //           >
-//             <View style={styles.prefixBox}>
-//               <Text style={styles.prefix}>🇮🇳 +91</Text>
-//             </View>
+//             <Text style={[styles.prefix, { color: colors.text }]}>+91</Text>
+
 //             <TextInput
 //               value={phone}
-//               onChangeText={(t) => {
-//                 setPhone(t);
+//               onChangeText={(text) => {
+//                 setPhone(sanitizePhone(text));
 //                 if (error) setError("");
 //               }}
-//               onFocus={handleFocus}
-//               onBlur={handleBlur}
 //               keyboardType="phone-pad"
+//               textContentType="telephoneNumber"
+//               autoComplete="tel"
 //               maxLength={10}
-//               placeholder="Enter 10-digit number"
-//               placeholderTextColor={colors.light.textMuted}
-//               style={styles.input}
+//               placeholder="Enter mobile number"
+//               placeholderTextColor={colors.textMuted}
+//               style={[styles.input, { color: colors.text }]}
 //             />
-//             {isPhoneComplete && (
-//               <View style={styles.checkBadge}>
-//                 <Text style={styles.checkIcon}>✓</Text>
-//               </View>
-//             )}
 //           </Animated.View>
 
 //           {error ? (
-//             <Animated.Text style={styles.errorText}>{error}</Animated.Text>
-//           ) : (
-//             <Text style={styles.hintText}>We will send you a 4-digit OTP</Text>
-//           )}
+//             <Text style={[styles.errorText, { color: colors.error }]}>
+//               {error}
+//             </Text>
+//           ) : null}
 
 //           <Pressable
-//             onPress={handleContinue}
+//             onPress={handleLogin}
 //             disabled={loading}
 //             style={({ pressed }) => [
 //               styles.button,
-//               pressed && styles.buttonPressed,
+//               {
+//                 backgroundColor:
+//                   pressed && !loading ? colors.primaryPressed : colors.primary,
+//               },
 //               loading && styles.buttonDisabled,
 //             ]}
 //           >
 //             {loading ? (
-//               <ActivityIndicator color="#fff" />
+//               <ActivityIndicator color={colors.white} />
 //             ) : (
-//               <Text style={styles.buttonText}>Continue →</Text>
+//               <Text style={[styles.buttonText, { color: colors.white }]}>
+//                 Login
+//               </Text>
 //             )}
 //           </Pressable>
 //         </View>
-
-//         <Text style={styles.footerText}>
-//           By continuing, you agree to our{" "}
-//           <Text style={styles.footerLink}>Terms of Service</Text> and{" "}
-//           <Text style={styles.footerLink}>Privacy Policy</Text>.
-//         </Text>
 //       </ScrollView>
 //     </KeyboardAvoidingView>
 //   );
 // }
 
 // const styles = StyleSheet.create({
-//   root: { flex: 1, backgroundColor: colors.light.background },
-//   scroll: { flexGrow: 1, paddingHorizontal: spacing.lg },
-//   header: { alignItems: "center", marginBottom: spacing["2xl"] },
-//   iconBadge: {
-//     width: 72,
-//     height: 72,
-//     borderRadius: 36,
-//     backgroundColor: colors.light.surfaceSecondary,
-//     alignItems: "center",
-//     justifyContent: "center",
-//     marginBottom: spacing.md,
+//   root: { flex: 1 },
+//   scroll: { flexGrow: 1 },
+//   hero: { alignItems: "center", justifyContent: "center" },
+//   heroImage: { width: "100%", height: "100%" },
+//   panel: {
+//     flexGrow: 1,
+//     borderTopLeftRadius: 28,
+//     borderTopRightRadius: 28,
+//     paddingHorizontal: spacing.lg,
+//     paddingTop: spacing.xl,
 //   },
-//   iconEmoji: { fontSize: 34 },
 //   title: {
-//     fontSize: 28,
+//     fontSize: 24,
 //     fontWeight: "800",
-//     color: colors.light.text,
-//     marginBottom: spacing.xs,
 //     textAlign: "center",
+//     marginBottom: spacing.xs,
 //   },
 //   subtitle: {
-//     fontSize: 15,
-//     color: colors.light.textSecondary,
+//     fontSize: 14,
+//     lineHeight: 20,
 //     textAlign: "center",
-//     lineHeight: 22,
-//   },
-//   card: {
-//     backgroundColor: colors.light.surface,
-//     borderRadius: radius.xl,
-//     padding: spacing["2xl"],
-//     gap: spacing.md,
-//     shadowColor: "#000",
-//     shadowOffset: { width: 0, height: 4 },
-//     shadowOpacity: 0.06,
-//     shadowRadius: 16,
-//     elevation: 4,
-//   },
-//   label: {
-//     fontSize: 13,
-//     fontWeight: "700",
-//     color: colors.light.textSecondary,
-//     textTransform: "uppercase",
-//     letterSpacing: 0.8,
+//     marginBottom: spacing.xl,
 //   },
 //   inputWrap: {
 //     flexDirection: "row",
 //     alignItems: "center",
+//     height: 56,
+//     borderRadius: radius.lg,
 //     borderWidth: 1.5,
-//     borderColor: colors.light.border,
-//     borderRadius: radius.lg,
-//     backgroundColor: colors.light.background,
-//     overflow: "hidden",
-//   },
-//   inputWrapError: { borderColor: colors.light.error },
-//   prefixBox: {
-//     paddingHorizontal: spacing.sm,
-//     paddingVertical: spacing.md,
-//     borderRightWidth: 1,
-//     borderRightColor: colors.light.border,
-//     backgroundColor: colors.light.surface,
-//   },
-//   prefix: { fontSize: 15, fontWeight: "600", color: colors.light.text },
-//   input: {
-//     flex: 1,
-//     height: 52,
 //     paddingHorizontal: spacing.md,
-//     fontSize: 17,
-//     fontWeight: "600",
-//     color: colors.light.text,
-//     letterSpacing: 1,
+//     columnGap: spacing.sm,
+//     shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.06,
+//     shadowRadius: 6,
+//     elevation: 2,
 //   },
-//   checkBadge: {
-//     width: 28,
-//     height: 28,
-//     borderRadius: 14,
-//     backgroundColor: colors.light.success,
-//     alignItems: "center",
-//     justifyContent: "center",
-//     marginRight: spacing.sm,
-//   },
-//   checkIcon: { color: "#fff", fontSize: 14, fontWeight: "700" },
-//   hintText: { fontSize: 12, color: colors.light.textMuted },
-//   errorText: { fontSize: 12, color: colors.light.error, fontWeight: "500" },
+//   prefix: { fontSize: 16, fontWeight: "700" },
+//   input: { flex: 1, height: "100%", fontSize: 16 },
+//   errorText: { fontSize: 12, marginTop: spacing.xs },
 //   button: {
-//     height: 54,
+//     height: 56,
 //     borderRadius: radius.lg,
-//     backgroundColor: colors.light.primary,
 //     alignItems: "center",
 //     justifyContent: "center",
-//     marginTop: spacing.xs,
-//     shadowColor: colors.light.primary,
-//     shadowOffset: { width: 0, height: 6 },
-//     shadowOpacity: 0.35,
-//     shadowRadius: 12,
-//     elevation: 6,
-//   },
-//   buttonPressed: {
-//     backgroundColor: colors.light.primaryPressed,
-//     shadowOpacity: 0.15,
+//     marginTop: spacing.lg,
 //   },
 //   buttonDisabled: { opacity: 0.6 },
-//   buttonText: {
-//     color: "#fff",
-//     fontSize: 16,
-//     fontWeight: "700",
-//     letterSpacing: 0.3,
-//   },
-//   footerText: {
-//     marginTop: spacing.xl,
-//     fontSize: 12,
-//     color: colors.light.textMuted,
-//     textAlign: "center",
-//     lineHeight: 18,
-//   },
-//   footerLink: { color: colors.light.primary, fontWeight: "600" },
+//   buttonText: { fontSize: 16, fontWeight: "700" },
 // });
 import { loginCustomer, sendOtp } from "@/features/auth/api/auth.api";
-import { colors, radius, spacing } from "@/theme";
+import { radius, spacing, useTheme } from "@/theme";
+import { Image } from "expo-image";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Image,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -347,14 +333,48 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const { height: SCREEN_H } = Dimensions.get("window");
+const HERO_H = Math.round(SCREEN_H * 0.4);
+const MOBILE_LENGTH = 10;
+
+function sanitizePhone(value: string) {
+  return value.replace(/\D/g, "").slice(0, MOBILE_LENGTH);
+}
+
+function extractStatus(source: unknown): number | undefined {
+  if (source && typeof source === "object") {
+    const obj = source as Record<string, any>;
+    const candidates = [
+      obj.status,
+      obj.statusCode,
+      obj.Status,
+      obj.response?.status,
+      obj.response?.Status,
+      obj.data?.Status,
+    ];
+
+    for (const c of candidates) {
+      if (typeof c === "number") return c;
+    }
+
+    const msg = typeof obj.message === "string" ? obj.message : "";
+    const match = msg.match(/\b(401|404)\b/);
+    if (match) return Number(match[1]);
+  }
+
+  return undefined;
+}
+
 export default function LoginRoute() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const inputScale = useRef(new Animated.Value(1)).current;
+  const cleanedPhone = sanitizePhone(phone);
 
   const shake = () => {
     Animated.sequence([
@@ -386,274 +406,244 @@ export default function LoginRoute() {
     ]).start();
   };
 
-  const handleFocus = () => {
-    Animated.spring(inputScale, {
-      toValue: 1.02,
-      useNativeDriver: true,
-      damping: 15,
-      stiffness: 200,
-    }).start();
+  const goToRegister = () => {
+    router.push({
+      pathname: "/(auth)/register",
+      params: { phone: cleanedPhone },
+    });
   };
 
-  const handleBlur = () => {
-    Animated.spring(inputScale, {
-      toValue: 1,
-      useNativeDriver: true,
-      damping: 15,
-      stiffness: 200,
-    }).start();
-  };
-
-  const handleContinue = async () => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length < 10) {
+  const handleLogin = async () => {
+    if (cleanedPhone.length < MOBILE_LENGTH) {
       setError("Please enter a valid 10-digit mobile number");
       shake();
       return;
     }
+
     setError("");
     setLoading(true);
 
     try {
-      const res = await loginCustomer(cleaned);
+      const res = await loginCustomer(cleanedPhone);
       if (__DEV__) console.log("LOGIN RES →", JSON.stringify(res));
 
-      if (res.Status === 200) {
+      const isExistingUser =
+        res.Status === 200 && Array.isArray(res.Data) && res.Data.length > 0;
+
+      if (isExistingUser) {
         try {
-          await sendOtp(cleaned);
-        } catch (e) {
-          if (__DEV__) console.warn("sendOtp failed (continuing to OTP):", e);
-        }
+          await sendOtp(cleanedPhone);
+        } catch {}
+
         router.push({
           pathname: "/(auth)/otp",
-          params: { phone: cleaned, mode: "login" },
+          params: { phone: cleanedPhone, mode: "login" },
         });
-      } else if (res.Status === 401) {
-        router.push({
-          pathname: "/(auth)/register",
-          params: { phone: cleaned },
-        });
-      } else {
-        setError(res.Message || "Something went wrong. Please try again.");
-        shake();
+        return;
       }
-    } catch (err: any) {
-      setError(err?.message || "Network error. Check your connection.");
+
+      const status = extractStatus(res);
+
+      if (status === 401 || status === 404 || res.Status === 200) {
+        goToRegister();
+        return;
+      }
+
+      setError(res.Message || "Something went wrong. Please try again.");
+      shake();
+    } catch (err: unknown) {
+      if (__DEV__) console.log("LOGIN ERR →", JSON.stringify(err), err);
+
+      const status = extractStatus(err);
+
+      if (status === 401 || status === 404) {
+        goToRegister();
+        return;
+      }
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Network error. Check your connection.";
+
+      setError(message);
       shake();
     } finally {
       setLoading(false);
     }
   };
 
-  const isPhoneComplete = phone.replace(/\D/g, "").length === 10;
+  const panelBg = isDark ? colors.surfaceSecondary : colors.skeletonBase;
+  const inputBlockBg = isDark ? colors.surface : colors.white;
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={[styles.root, { backgroundColor: colors.surface }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={0}
     >
+      <StatusBar style="light" />
+      <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
+          { paddingBottom: insets.bottom + spacing.xl },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        <View style={styles.header}>
-          <View style={styles.logoWrap}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={styles.logoImg}
-              resizeMode="cover"
-            />
-          </View>
-          <Text style={styles.title}>Welcome back!</Text>
-          <Text style={styles.subtitle}>
-            Enter your mobile number to sign in or create your account.
-          </Text>
+        <View style={[styles.hero, { height: HERO_H }]}>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={styles.heroImage}
+            contentFit="contain"
+          />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Mobile Number</Text>
+        <View
+          style={[
+            styles.panel,
+            {
+              backgroundColor: panelBg,
+              paddingBottom: insets.bottom + spacing.xl,
+              minHeight: SCREEN_H - HERO_H,
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: colors.text }]}>Login</Text>
+
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Welcome to ShreeChhagan, please login to your account using your
+            mobile number
+          </Text>
 
           <Animated.View
             style={[
               styles.inputWrap,
-              { transform: [{ translateX: shakeAnim }, { scale: inputScale }] },
-              error ? styles.inputWrapError : null,
+              {
+                backgroundColor: inputBlockBg,
+                borderColor: error ? colors.error : colors.border,
+                shadowColor: colors.black,
+                transform: [{ translateX: shakeAnim }],
+              },
             ]}
           >
-            <View style={styles.prefixBox}>
-              <Text style={styles.prefix}>🇮🇳 +91</Text>
-            </View>
+            <Text style={[styles.prefix, { color: colors.text }]}>+91</Text>
+
             <TextInput
               value={phone}
-              onChangeText={(t) => {
-                setPhone(t);
+              onChangeText={(text) => {
+                setPhone(sanitizePhone(text));
                 if (error) setError("");
               }}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
               keyboardType="phone-pad"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
               maxLength={10}
-              placeholder="Enter 10-digit number"
-              placeholderTextColor={colors.light.textMuted}
-              style={styles.input}
+              placeholder="Enter mobile number"
+              placeholderTextColor={colors.textMuted}
+              style={[styles.input, { color: colors.text }]}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
-            {isPhoneComplete && (
-              <View style={styles.checkBadge}>
-                <Text style={styles.checkIcon}>✓</Text>
-              </View>
-            )}
           </Animated.View>
 
           {error ? (
-            <Animated.Text style={styles.errorText}>{error}</Animated.Text>
-          ) : (
-            <Text style={styles.hintText}>We will send you a 4-digit OTP</Text>
-          )}
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {error}
+            </Text>
+          ) : null}
 
           <Pressable
-            onPress={handleContinue}
+            onPress={handleLogin}
             disabled={loading}
             style={({ pressed }) => [
               styles.button,
-              pressed && styles.buttonPressed,
+              {
+                backgroundColor:
+                  pressed && !loading ? colors.primaryPressed : colors.primary,
+              },
               loading && styles.buttonDisabled,
             ]}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Continue →</Text>
+              <Text style={[styles.buttonText, { color: colors.white }]}>
+                Login
+              </Text>
             )}
           </Pressable>
         </View>
-
-        <Text style={styles.footerText}>
-          By continuing, you agree to our{" "}
-          <Text style={styles.footerLink}>Terms of Service</Text> and{" "}
-          <Text style={styles.footerLink}>Privacy Policy</Text>.
-        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.light.background },
-  scroll: { flexGrow: 1, paddingHorizontal: spacing.lg },
-  header: { alignItems: "center", marginBottom: spacing["2xl"] },
-  logoWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    overflow: "hidden",
-    marginBottom: spacing.md,
-    backgroundColor: colors.light.surfaceSecondary,
+  root: { flex: 1 },
+  scroll: { flexGrow: 1 },
+  hero: { alignItems: "center", justifyContent: "center" },
+  heroImage: { width: "100%", height: "100%" },
+  panel: {
+    flexGrow: 1,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
-  logoImg: { width: "100%", height: "100%" },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
-    color: colors.light.text,
-    marginBottom: spacing.xs,
     textAlign: "center",
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 15,
-    color: colors.light.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: "center",
-    lineHeight: 22,
-  },
-  card: {
-    backgroundColor: colors.light.surface,
-    borderRadius: radius.xl,
-    padding: spacing["2xl"],
-    gap: spacing.md,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.light.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    marginBottom: spacing.xl,
   },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",
+    height: 56,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
-    borderColor: colors.light.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.light.background,
-    overflow: "hidden",
-  },
-  inputWrapError: { borderColor: colors.light.error },
-  prefixBox: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRightWidth: 1,
-    borderRightColor: colors.light.border,
-    backgroundColor: colors.light.surface,
-  },
-  prefix: { fontSize: 15, fontWeight: "600", color: colors.light.text },
-  input: {
-    flex: 1,
-    height: 52,
     paddingHorizontal: spacing.md,
-    fontSize: 17,
-    fontWeight: "600",
-    color: colors.light.text,
-    letterSpacing: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  checkBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.light.success,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: spacing.sm,
-  },
-  checkIcon: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  hintText: { fontSize: 12, color: colors.light.textMuted },
-  errorText: { fontSize: 12, color: colors.light.error, fontWeight: "500" },
-  button: {
-    height: 54,
-    borderRadius: radius.lg,
-    backgroundColor: colors.light.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: spacing.xs,
-    shadowColor: colors.light.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  buttonPressed: {
-    backgroundColor: colors.light.primaryPressed,
-    shadowOpacity: 0.15,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: {
-    color: "#fff",
+  prefix: {
     fontSize: 16,
     fontWeight: "700",
-    letterSpacing: 0.3,
+    marginRight: spacing.sm,
   },
-  footerText: {
-    marginTop: spacing.xl,
+  input: {
+    flex: 1,
+    height: "100%",
+    fontSize: 16,
+  },
+  errorText: {
     fontSize: 12,
-    color: colors.light.textMuted,
-    textAlign: "center",
-    lineHeight: 18,
+    marginTop: spacing.xs,
   },
-  footerLink: { color: colors.light.primary, fontWeight: "600" },
+  button: {
+    height: 56,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.lg,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

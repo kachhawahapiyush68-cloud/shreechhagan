@@ -1,179 +1,159 @@
-// // src/app/splash.tsx
 // import { getSplashBanners } from "@/features/auth/api/auth.api";
+// import { useTheme } from "@/theme";
 // import type { SplashBannerDto } from "@/types/api";
 // import { Image } from "expo-image";
 // import { router } from "expo-router";
 // import { useEffect, useRef, useState } from "react";
 // import {
-//   Animated,
+//   ActivityIndicator,
 //   Dimensions,
 //   FlatList,
 //   StyleSheet,
-//   Text,
 //   View,
-//   ViewToken,
+//   type ViewToken,
 // } from "react-native";
 // import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-// const SLIDE_DURATION = 3000; // ms each banner shows
-// const NAV_DELAY = 500; // short pause after last banner
+// const SLIDE_DURATION = 3000;
 
 // export default function SplashRoute() {
 //   const insets = useSafeAreaInsets();
+//   const { colors } = useTheme();
+
 //   const [banners, setBanners] = useState<SplashBannerDto[]>([]);
-//   const [activeIndex, setActiveIndex] = useState(0);
 //   const [ready, setReady] = useState(false);
+//   const [activeIndex, setActiveIndex] = useState(0);
+
 //   const flatListRef = useRef<FlatList<SplashBannerDto>>(null);
 //   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-//   // Logo / brand fade-in
-//   const brandOpacity = useRef(new Animated.Value(0)).current;
-//   const brandTranslate = useRef(new Animated.Value(24)).current;
-
 //   useEffect(() => {
-//     // Animate brand in
-//     Animated.parallel([
-//       Animated.timing(brandOpacity, {
-//         toValue: 1,
-//         duration: 700,
-//         useNativeDriver: true,
-//       }),
-//       Animated.spring(brandTranslate, {
-//         toValue: 0,
-//         useNativeDriver: true,
-//         damping: 18,
-//         stiffness: 140,
-//       }),
-//     ]).start();
+//     let mounted = true;
 
-//     // Fetch banners
-//     getSplashBanners().then((data) => {
-//       setBanners(data);
-//       setReady(true);
-//     });
-//   }, []);
-
-//   // Auto-slide & navigate
-//   useEffect(() => {
-//     if (!ready) return;
-//     if (banners.length === 0) {
-//       // No banners: show branding for 2.5s then navigate
-//       timerRef.current = setTimeout(() => {
-//         router.replace("/(auth)/login");
-//       }, 2500);
-//       return;
-//     }
-
-//     const totalSlides = banners.length;
-
-//     const advance = (index: number) => {
-//       if (index < totalSlides - 1) {
-//         const nextIndex = index + 1;
-//         flatListRef.current?.scrollToIndex({
-//           index: nextIndex,
-//           animated: true,
-//         });
-//         setActiveIndex(nextIndex);
-//         timerRef.current = setTimeout(() => advance(nextIndex), SLIDE_DURATION);
-//       } else {
-//         // Last slide done → navigate
-//         timerRef.current = setTimeout(() => {
-//           router.replace("/(auth)/login");
-//         }, NAV_DELAY);
-//       }
-//     };
-
-//     timerRef.current = setTimeout(() => advance(0), SLIDE_DURATION);
+//     getSplashBanners()
+//       .then((data) => {
+//         if (!mounted) return;
+//         setBanners(Array.isArray(data) ? data : []);
+//       })
+//       .catch(() => {
+//         if (!mounted) return;
+//         setBanners([]);
+//       })
+//       .finally(() => {
+//         if (!mounted) return;
+//         setReady(true);
+//       });
 
 //     return () => {
-//       if (timerRef.current) clearTimeout(timerRef.current);
+//       mounted = false;
 //     };
+//   }, []);
+
+//   useEffect(() => {
+//     if (!ready || banners.length > 0) return;
+
+//     const fallbackTimer = setTimeout(() => {
+//       router.replace("/(auth)/login");
+//     }, 800);
+
+//     return () => clearTimeout(fallbackTimer);
 //   }, [ready, banners.length]);
+
+//   useEffect(() => {
+//     if (!ready || banners.length === 0) return;
+
+//     if (timerRef.current) {
+//       clearTimeout(timerRef.current);
+//     }
+
+//     timerRef.current = setTimeout(() => {
+//       if (activeIndex >= banners.length - 1) {
+//         router.replace("/(auth)/login");
+//         return;
+//       }
+
+//       const nextIndex = activeIndex + 1;
+//       flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+//       setActiveIndex(nextIndex);
+//     }, SLIDE_DURATION);
+
+//     return () => {
+//       if (timerRef.current) {
+//         clearTimeout(timerRef.current);
+//       }
+//     };
+//   }, [ready, activeIndex, banners.length]);
 
 //   const onViewableItemsChanged = useRef(
 //     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-//       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-//         setActiveIndex(viewableItems[0].index);
+//       const currentItem = viewableItems[0];
+//       if (currentItem?.index != null) {
+//         setActiveIndex(currentItem.index);
 //       }
 //     },
 //   ).current;
 
-//   return (
-//     <View style={styles.container}>
-//       {/* Banner slides */}
-//       {banners.length > 0 ? (
-//         <FlatList
-//           ref={flatListRef}
-//           data={banners}
-//           horizontal
-//           pagingEnabled
-//           scrollEnabled={false}
-//           showsHorizontalScrollIndicator={false}
-//           keyExtractor={(item) => String(item.BannerId)}
-//           onViewableItemsChanged={onViewableItemsChanged}
-//           viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-//           renderItem={({ item }) => (
-//             <Image
-//               source={{ uri: item.BannerImageUrl }}
-//               style={styles.bannerImage}
-//               contentFit="cover"
-//             />
-//           )}
-//         />
-//       ) : (
-//         // Fallback gradient background when no banners
-//         <View style={styles.fallbackBg} />
-//       )}
-
-//       {/* Dark gradient overlay */}
-//       <View style={styles.overlay} />
-
-//       {/* Brand text */}
-//       <Animated.View
+//   if (!ready || banners.length === 0) {
+//     return (
+//       <View
 //         style={[
-//           styles.brandContainer,
-//           {
-//             paddingTop: insets.top + 32,
-//             opacity: brandOpacity,
-//             transform: [{ translateY: brandTranslate }],
-//           },
+//           styles.container,
+//           styles.center,
+//           { backgroundColor: colors.background },
 //         ]}
 //       >
-//         <View style={styles.logoCircle}>
-//           <Text style={styles.logoEmoji}>🛵</Text>
-//         </View>
-//         <Text style={styles.brandName}>ShreeChhagan</Text>
-//         <Text style={styles.brandTagline}>
-//           Delivering happiness to your door
-//         </Text>
-//       </Animated.View>
+//         <ActivityIndicator color={colors.primary} />
+//       </View>
+//     );
+//   }
 
-//       {/* Dots indicator */}
-//       {banners.length > 1 && (
+//   return (
+//     <View style={[styles.container, { backgroundColor: colors.background }]}>
+//       <FlatList
+//         ref={flatListRef}
+//         style={StyleSheet.absoluteFill}
+//         data={banners}
+//         horizontal
+//         pagingEnabled
+//         showsHorizontalScrollIndicator={false}
+//         keyExtractor={(item) => String(item.BannerId)}
+//         onViewableItemsChanged={onViewableItemsChanged}
+//         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+//         getItemLayout={(_, index) => ({
+//           length: SCREEN_W,
+//           offset: SCREEN_W * index,
+//           index,
+//         })}
+//         renderItem={({ item }) => (
+//           <Image
+//             source={{ uri: item.BannerImageUrl }}
+//             style={styles.bannerImage}
+//             contentFit="cover"
+//             transition={250}
+//           />
+//         )}
+//       />
+
+//       {banners.length > 1 ? (
 //         <View
-//           style={[styles.dotsContainer, { paddingBottom: insets.bottom + 40 }]}
+//           style={[styles.dotsContainer, { paddingBottom: insets.bottom + 28 }]}
 //         >
-//           {banners.map((_, i) => (
-//             <Animated.View
-//               key={i}
+//           {banners.map((_, index) => (
+//             <View
+//               key={index}
 //               style={[
 //                 styles.dot,
-//                 i === activeIndex ? styles.dotActive : styles.dotInactive,
+//                 {
+//                   backgroundColor:
+//                     index === activeIndex ? colors.primary : colors.overlay,
+//                 },
+//                 index === activeIndex ? styles.dotActive : styles.dotInactive,
 //               ]}
 //             />
 //           ))}
 //         </View>
-//       )}
-
-//       {/* Loading indicator */}
-//       {banners.length === 0 && ready && (
-//         <View
-//           style={[styles.dotsContainer, { paddingBottom: insets.bottom + 40 }]}
-//         >
-//           <Text style={styles.loadingText}>Loading…</Text>
-//         </View>
-//       )}
+//       ) : null}
 //     </View>
 //   );
 // }
@@ -181,60 +161,14 @@
 // const styles = StyleSheet.create({
 //   container: {
 //     flex: 1,
-//     backgroundColor: "#0F0F0F",
+//   },
+//   center: {
+//     alignItems: "center",
+//     justifyContent: "center",
 //   },
 //   bannerImage: {
 //     width: SCREEN_W,
 //     height: SCREEN_H,
-//   },
-//   fallbackBg: {
-//     position: "absolute",
-//     width: SCREEN_W,
-//     height: SCREEN_H,
-//     backgroundColor: "#1A0A00",
-//   },
-//   overlay: {
-//     ...StyleSheet.absoluteFillObject,
-//     backgroundColor: "rgba(0,0,0,0.45)",
-//   },
-//   brandContainer: {
-//     position: "absolute",
-//     top: 0,
-//     left: 0,
-//     right: 0,
-//     alignItems: "center",
-//     paddingHorizontal: 24,
-//   },
-//   logoCircle: {
-//     width: 80,
-//     height: 80,
-//     borderRadius: 40,
-//     backgroundColor: "rgba(252,128,25,0.18)",
-//     borderWidth: 2,
-//     borderColor: "#FC8019",
-//     alignItems: "center",
-//     justifyContent: "center",
-//     marginBottom: 16,
-//   },
-//   logoEmoji: {
-//     fontSize: 40,
-//   },
-//   brandName: {
-//     fontSize: 34,
-//     fontWeight: "800",
-//     color: "#FFFFFF",
-//     letterSpacing: 0.5,
-//     textShadowColor: "rgba(0,0,0,0.6)",
-//     textShadowOffset: { width: 0, height: 2 },
-//     textShadowRadius: 8,
-//   },
-//   brandTagline: {
-//     marginTop: 8,
-//     fontSize: 15,
-//     color: "rgba(255,255,255,0.75)",
-//     textShadowColor: "rgba(0,0,0,0.4)",
-//     textShadowOffset: { width: 0, height: 1 },
-//     textShadowRadius: 4,
 //   },
 //   dotsContainer: {
 //     position: "absolute",
@@ -251,20 +185,14 @@
 //     borderRadius: 4,
 //   },
 //   dotActive: {
-//     width: 28,
-//     backgroundColor: "#FC8019",
+//     width: 26,
 //   },
 //   dotInactive: {
 //     width: 8,
-//     backgroundColor: "rgba(255,255,255,0.5)",
-//   },
-//   loadingText: {
-//     color: "rgba(255,255,255,0.6)",
-//     fontSize: 14,
 //   },
 // });
-// src/app/splash.tsx
 import { getSplashBanners } from "@/features/auth/api/auth.api";
+import { useTheme } from "@/theme";
 import type { SplashBannerDto } from "@/types/api";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -273,19 +201,21 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Pressable,
   StyleSheet,
+  Text,
   View,
-  ViewToken,
+  type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-const SLIDE_DURATION = 3000; // ms each banner shows
-const BRAND_BG = "#FBF4EA"; // soft cream while loading (matches the art)
-const GOLD = "#C8941E";
+const SLIDE_DURATION = 3000;
 
 export default function SplashRoute() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+
   const [banners, setBanners] = useState<SplashBannerDto[]>([]);
   const [ready, setReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -293,61 +223,139 @@ export default function SplashRoute() {
   const flatListRef = useRef<FlatList<SplashBannerDto>>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch banners once
   useEffect(() => {
-    getSplashBanners()
-      .then((data) => setBanners(Array.isArray(data) ? data : []))
-      .catch(() => setBanners([]))
-      .finally(() => setReady(true));
+    let mounted = true;
+
+    async function loadBanners() {
+      try {
+        const data = await getSplashBanners();
+        if (!mounted) return;
+        setBanners(Array.isArray(data) ? data : []);
+      } catch {
+        if (!mounted) return;
+        setBanners([]);
+      } finally {
+        if (!mounted) return;
+        setReady(true);
+      }
+    }
+
+    void loadBanners();
+
+    return () => {
+      mounted = false;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, []);
 
-  // No banners (or fetch failed) → straight to login
-  useEffect(() => {
-    if (ready && banners.length === 0) {
-      const t = setTimeout(() => router.replace("/(auth)/login"), 800);
-      return () => clearTimeout(t);
+  const goToLogin = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  }, [ready, banners.length]);
+    router.replace("/(auth)/login");
+  };
 
-  // Auto-advance; reschedules when the active slide changes (also covers swipe)
+  const goToNext = () => {
+    if (banners.length === 0) return;
+
+    const isLast = activeIndex === banners.length - 1;
+
+    if (isLast) {
+      goToLogin();
+      return;
+    }
+
+    const nextIndex = activeIndex + 1;
+    flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+    setActiveIndex(nextIndex);
+  };
+
   useEffect(() => {
-    if (!ready || banners.length === 0) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!ready) return;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (banners.length === 0) {
+      timerRef.current = setTimeout(() => {
+        router.replace("/(auth)/login");
+      }, 800);
+
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }
 
     timerRef.current = setTimeout(() => {
-      if (activeIndex >= banners.length - 1) {
+      const isLast = activeIndex >= banners.length - 1;
+
+      if (isLast) {
         router.replace("/(auth)/login");
-      } else {
-        const next = activeIndex + 1;
-        flatListRef.current?.scrollToIndex({ index: next, animated: true });
-        setActiveIndex(next);
+        return;
       }
+
+      const nextIndex = activeIndex + 1;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setActiveIndex(nextIndex);
     }, SLIDE_DURATION);
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [ready, activeIndex, banners.length]);
+  }, [ready, banners.length, activeIndex]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        setActiveIndex(viewableItems[0].index);
+      const currentItem = viewableItems[0];
+      if (currentItem?.index != null) {
+        setActiveIndex(currentItem.index);
       }
     },
   ).current;
 
-  // Loading / no-banner state: clean branded background with a small spinner
-  if (!ready || banners.length === 0) {
+  if (!ready) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={GOLD} />
+      <View
+        style={[
+          styles.container,
+          styles.center,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
 
+  if (banners.length === 0) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.center,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  const isLastSlide = activeIndex === banners.length - 1;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         ref={flatListRef}
         style={StyleSheet.absoluteFill}
@@ -355,7 +363,9 @@ export default function SplashRoute() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => String(item.BannerId)}
+        keyExtractor={(item, index) =>
+          String(item.BannerId ?? item.BannerImageUrl ?? index)
+        }
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         getItemLayout={(_, index) => ({
@@ -373,32 +383,85 @@ export default function SplashRoute() {
         )}
       />
 
-      {banners.length > 1 && (
-        <View
-          style={[styles.dotsContainer, { paddingBottom: insets.bottom + 28 }]}
-        >
-          {banners.map((_, i) => (
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={12}
+        onPress={goToLogin}
+        style={[
+          styles.skipButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: "rgba(0,0,0,0.25)",
+          },
+        ]}
+      >
+        <Text style={styles.skipText}>Skip</Text>
+      </Pressable>
+
+      {banners.length > 1 ? (
+        <View style={[styles.dotsContainer, { bottom: insets.bottom + 82 }]}>
+          {banners.map((_, index) => (
             <View
-              key={i}
+              key={index}
               style={[
                 styles.dot,
-                i === activeIndex ? styles.dotActive : styles.dotInactive,
+                {
+                  backgroundColor:
+                    index === activeIndex
+                      ? colors.primary
+                      : "rgba(255,255,255,0.5)",
+                },
+                index === activeIndex ? styles.dotActive : styles.dotInactive,
               ]}
             />
           ))}
         </View>
-      )}
+      ) : null}
+
+      <View
+        style={[styles.bottomActionWrap, { paddingBottom: insets.bottom + 24 }]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={goToNext}
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+        >
+          <Text style={styles.actionButtonText}>
+            {isLastSlide ? "Login" : "Next"}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BRAND_BG },
-  center: { alignItems: "center", justifyContent: "center" },
-  bannerImage: { width: SCREEN_W, height: SCREEN_H },
+  container: {
+    flex: 1,
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bannerImage: {
+    width: SCREEN_W,
+    height: SCREEN_H,
+  },
+  skipButton: {
+    position: "absolute",
+    right: 16,
+    zIndex: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  skipText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   dotsContainer: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -406,7 +469,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  dot: { height: 8, borderRadius: 4 },
-  dotActive: { width: 26, backgroundColor: GOLD },
-  dotInactive: { width: 8, backgroundColor: "rgba(200,148,30,0.4)" },
+  dot: {
+    height: 8,
+    borderRadius: 4,
+  },
+  dotActive: {
+    width: 26,
+  },
+  dotInactive: {
+    width: 8,
+  },
+  bottomActionWrap: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 0,
+  },
+  actionButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

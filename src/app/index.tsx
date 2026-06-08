@@ -1,14 +1,112 @@
+// import { Redirect } from "expo-router";
+// import { useEffect, useState } from "react";
+// import { ActivityIndicator, StyleSheet, View } from "react-native";
+
+// import { useAuthStore } from "@/features/auth/store/auth.store";
+// import { getAccessToken } from "@/lib/secure-storage";
+// import { colors } from "@/theme";
+
+// export default function IndexPage() {
+//   const hasHydrated = useAuthStore((s) => s.hasHydrated);
+//   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+//   const isOnboardingCompleted = useAuthStore((s) => s.isOnboardingCompleted);
+
+//   const [tokenChecked, setTokenChecked] = useState(false);
+//   const [hasSecureToken, setHasSecureToken] = useState(false);
+
+//   useEffect(() => {
+//     let mounted = true;
+
+//     async function checkToken() {
+//       try {
+//         const token = await getAccessToken();
+//         if (mounted) {
+//           setHasSecureToken(!!token);
+//         }
+//       } finally {
+//         if (mounted) {
+//           setTokenChecked(true);
+//         }
+//       }
+//     }
+
+//     void checkToken();
+
+//     return () => {
+//       mounted = false;
+//     };
+//   }, []);
+
+//   if (!hasHydrated || !tokenChecked) {
+//     return (
+//       <View style={styles.loaderContainer}>
+//         <ActivityIndicator size="large" color={colors.light.primary} />
+//       </View>
+//     );
+//   }
+
+//   if (isAuthenticated || hasSecureToken) {
+//     return <Redirect href="/(tabs)/home" />;
+//   }
+
+//   if (!isOnboardingCompleted) {
+//     return <Redirect href="/(onboarding)" />;
+//   }
+
+//   return <Redirect href="/splash" />;
+// }
+
+// const styles = StyleSheet.create({
+//   loaderContainer: {
+//     flex: 1,
+//     backgroundColor: colors.light.background,
+//     alignItems: "center",
+//     justifyContent: "center",
+//   },
+// });
 import { Redirect } from "expo-router";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { getAccessToken } from "@/lib/secure-storage";
 import { colors } from "@/theme";
 
 export default function IndexPage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  if (!hasHydrated) {
+  const [tokenChecked, setTokenChecked] = useState(false);
+  const [hasSecureToken, setHasSecureToken] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkToken() {
+      try {
+        const token = await getAccessToken();
+        if (mounted) {
+          setHasSecureToken(!!token);
+        }
+      } catch {
+        if (mounted) {
+          setHasSecureToken(false);
+        }
+      } finally {
+        if (mounted) {
+          setTokenChecked(true);
+        }
+      }
+    }
+
+    void checkToken();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!hasHydrated || !tokenChecked) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={colors.light.primary} />
@@ -16,12 +114,10 @@ export default function IndexPage() {
     );
   }
 
-  // Already logged in → go straight to home
-  if (accessToken) {
+  if (isAuthenticated || hasSecureToken) {
     return <Redirect href="/(tabs)/home" />;
   }
 
-  // Not logged in → show splash first
   return <Redirect href="/splash" />;
 }
 

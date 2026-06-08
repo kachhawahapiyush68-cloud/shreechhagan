@@ -1,10 +1,11 @@
 export const colors = {
   light: {
-    background: "#FFF8F2",
+    background: "#FFF7F3",
     surface: "#FFFFFF",
-    surfaceSecondary: "#FFF1E7",
-    primary: "#FC8019",
-    primaryPressed: "#E56F10",
+    surfaceSecondary: "#FBEEE8",
+    primary: "#D17455", // terracotta (was #FC8019)
+    primaryPressed: "#B96045",
+    banner: "#D0A595", // promo banner clay  (NEW token)
     secondary: "#1F2937",
     text: "#111827",
     textSecondary: "#6B7280",
@@ -20,13 +21,15 @@ export const colors = {
     skeletonBase: "#F3F4F6",
     skeletonHighlight: "#E5E7EB",
     tabBarBackground: "#FFFFFF",
+    cardShadow: "rgba(17, 24, 39, 0.08)",
   },
   dark: {
     background: "#0F172A",
     surface: "#111827",
     surfaceSecondary: "#1F2937",
-    primary: "#FF8A26",
-    primaryPressed: "#F97316",
+    primary: "#DE8366",
+    primaryPressed: "#C96B4D",
+    banner: "#6B4A3E",
     secondary: "#E5E7EB",
     text: "#F9FAFB",
     textSecondary: "#D1D5DB",
@@ -42,7 +45,9 @@ export const colors = {
     skeletonBase: "#1F2937",
     skeletonHighlight: "#374151",
     tabBarBackground: "#111827",
+    cardShadow: "rgba(0, 0, 0, 0.3)",
   },
 } as const;
 
 export type AppColors = typeof colors.light;
+export type ColorSchemeName = keyof typeof colors;

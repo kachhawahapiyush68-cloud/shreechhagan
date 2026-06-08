@@ -1,10 +1,28 @@
-// src/providers/app-providers.tsx
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// // src/providers/app-providers.tsx
+// import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// import type { PropsWithChildren } from "react";
+// import { GestureHandlerRootView } from "react-native-gesture-handler";
+// import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// const queryClient = new QueryClient();
+
+// export function AppProviders({ children }: PropsWithChildren) {
+//   return (
+//     <GestureHandlerRootView style={{ flex: 1 }}>
+//       <SafeAreaProvider>
+//         <QueryClientProvider client={queryClient}>
+//           {children}
+//         </QueryClientProvider>
+//       </SafeAreaProvider>
+//     </GestureHandlerRootView>
+//   );
+// }
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-const queryClient = new QueryClient();
+import { queryClient } from "@/lib/query-client";
 
 export function AppProviders({ children }: PropsWithChildren) {
   return (
