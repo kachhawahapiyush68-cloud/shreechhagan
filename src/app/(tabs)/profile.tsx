@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,8 +23,10 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { radius, spacing, useTheme } from "@/theme";
 import type { AddressDto } from "@/types/api";
 
+/* ─────────────────────────── types ─────────────────────────── */
 type ProfileSection = "main" | "addresses";
 
+/* ─────────────────────────── helpers ─────────────────────────── */
 function sanitizePhone(value: string) {
   return value.replace(/\D/g, "").slice(0, 10);
 }
@@ -32,6 +35,9 @@ function toDataUri(base64: string, mimeType = "image/jpeg") {
   return `data:${mimeType};base64,${base64}`;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ProfileTab
+═══════════════════════════════════════════════════════════════ */
 export default function ProfileTab() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -40,6 +46,7 @@ export default function ProfileTab() {
   const logout = useAuthStore((s) => s.logout);
   const updateUser = useAuthStore((s) => s.updateUser);
 
+  /* ── local state ── */
   const [section, setSection] = useState<ProfileSection>("main");
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editAddress, setEditAddress] = useState<AddressDto | null>(null);
@@ -57,6 +64,7 @@ export default function ProfileTab() {
     [user?.fullName],
   );
 
+  /* ─── logout ─── */
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -68,6 +76,7 @@ export default function ProfileTab() {
     ]);
   };
 
+  /* ─── address helpers ─── */
   const handleOpenAddressForm = (address?: AddressDto) => {
     setEditAddress(address ?? null);
     setShowAddressForm(true);
@@ -78,6 +87,7 @@ export default function ProfileTab() {
     setEditAddress(null);
   };
 
+  /* ─── profile edit ─── */
   const resetProfileForm = () => {
     setFullName(user?.fullName ?? "");
     setPhone(user?.phone ?? "");
@@ -101,7 +111,6 @@ export default function ProfileTab() {
       Alert.alert("Validation", "Please enter your full name.");
       return;
     }
-
     if (cleanedPhone.length !== 10) {
       Alert.alert("Validation", "Please enter a valid 10-digit mobile number.");
       return;
@@ -147,6 +156,7 @@ export default function ProfileTab() {
     }
   };
 
+  /* ─── photo picker ─── */
   const pickAndUploadPhoto = async (fromCamera: boolean) => {
     try {
       setPhotoBusy(true);
@@ -181,15 +191,10 @@ export default function ProfileTab() {
             base64: true,
           });
 
-      if (result.canceled || !result.assets?.[0]) {
-        return;
-      }
+      if (result.canceled || !result.assets?.[0]) return;
 
       const asset = result.assets[0];
-
-      if (!asset.base64) {
-        throw new Error("Image base64 data not available.");
-      }
+      if (!asset.base64) throw new Error("Image base64 data not available.");
 
       const mimeType = asset.mimeType || "image/jpeg";
       const fileName =
@@ -214,20 +219,22 @@ export default function ProfileTab() {
     Alert.alert("Profile photo", "Choose an option", [
       {
         text: "Take photo",
-        onPress: () => {
-          void pickAndUploadPhoto(true);
-        },
+        onPress: () => void pickAndUploadPhoto(true),
       },
       {
         text: "Choose from gallery",
-        onPress: () => {
-          void pickAndUploadPhoto(false);
-        },
+        onPress: () => void pickAndUploadPhoto(false),
       },
       { text: "Cancel", style: "cancel" },
     ]);
   };
 
+  /* ─── content page navigation ─── */
+  const openContent = (slug: "privacy" | "help" | "terms") => {
+    router.push(`/content/${slug}` as any);
+  };
+
+  /* ═══════════════════════════ render ═══════════════════════════ */
   return (
     <View
       style={[
@@ -243,12 +250,14 @@ export default function ProfileTab() {
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* ── heading ── */}
           <View style={styles.headerRow}>
             <Text style={[styles.heading, { color: colors.text }]}>
               Profile
             </Text>
           </View>
 
+          {/* ── avatar card ── */}
           <View
             style={[
               styles.avatarCard,
@@ -325,6 +334,7 @@ export default function ProfileTab() {
             </View>
           </View>
 
+          {/* ── inline edit form ── */}
           {isEditingProfile ? (
             <View
               style={[
@@ -415,6 +425,7 @@ export default function ProfileTab() {
             </View>
           ) : null}
 
+          {/* ═══════════ ACCOUNT section ═══════════ */}
           <View style={styles.menuSection}>
             <Text
               style={[styles.menuSectionLabel, { color: colors.textMuted }]}
@@ -434,7 +445,7 @@ export default function ProfileTab() {
               icon="receipt-outline"
               label="My Orders"
               colors={colors}
-              onPress={() => {}}
+              onPress={() => router.push("/(tabs)/orders")}
               showChevron
             />
 
@@ -442,33 +453,59 @@ export default function ProfileTab() {
               icon="heart-outline"
               label="Favourites"
               colors={colors}
-              onPress={() => {}}
+              onPress={() => router.push("/favourites")}
               showChevron
             />
-          </View>
-
-          <View style={styles.menuSection}>
-            <Text
-              style={[styles.menuSectionLabel, { color: colors.textMuted }]}
-            >
-              More
-            </Text>
 
             <ProfileMenuItem
               icon="notifications-outline"
               label="Notifications"
               colors={colors}
-              onPress={() => {}}
+              onPress={() => router.push("/notifications" as any)}
               showChevron
             />
+          </View>
+
+          {/* ═══════════ SUPPORT section ═══════════ */}
+          <View style={styles.menuSection}>
+            <Text
+              style={[styles.menuSectionLabel, { color: colors.textMuted }]}
+            >
+              Support
+            </Text>
 
             <ProfileMenuItem
               icon="help-circle-outline"
               label="Help & Support"
               colors={colors}
-              onPress={() => {}}
+              onPress={() => openContent("help")}
               showChevron
             />
+
+            <ProfileMenuItem
+              icon="shield-checkmark-outline"
+              label="Privacy Policy"
+              colors={colors}
+              onPress={() => openContent("privacy")}
+              showChevron
+            />
+
+            <ProfileMenuItem
+              icon="document-text-outline"
+              label="Terms & Conditions"
+              colors={colors}
+              onPress={() => openContent("terms")}
+              showChevron
+            />
+          </View>
+
+          {/* ═══════════ DANGER section ═══════════ */}
+          <View style={styles.menuSection}>
+            <Text
+              style={[styles.menuSectionLabel, { color: colors.textMuted }]}
+            >
+              Account actions
+            </Text>
 
             <ProfileMenuItem
               icon="log-out-outline"
@@ -480,6 +517,7 @@ export default function ProfileTab() {
           </View>
         </ScrollView>
       ) : (
+        /* ─── Addresses sub-screen ─── */
         <View style={styles.subScreenRoot}>
           <View
             style={[
@@ -510,6 +548,7 @@ export default function ProfileTab() {
         </View>
       )}
 
+      {/* ─── Address form modal ─── */}
       <Modal
         visible={showAddressForm}
         animationType="slide"
@@ -526,6 +565,9 @@ export default function ProfileTab() {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ProfileMenuItem
+═══════════════════════════════════════════════════════════════ */
 type MenuItemProps = {
   icon: string;
   label: string;
@@ -554,11 +596,24 @@ function ProfileMenuItem({
         },
       ]}
     >
-      <Ionicons
-        name={icon as any}
-        size={20}
-        color={destructive ? colors.error : colors.primary}
-      />
+      {/* tinted icon badge — matches Swiggy/Zomato settings row feel */}
+      <View
+        style={[
+          styles.menuIconWrap,
+          {
+            backgroundColor: destructive
+              ? colors.error + "18"
+              : colors.primary + "18",
+          },
+        ]}
+      >
+        <Ionicons
+          name={icon as any}
+          size={18}
+          color={destructive ? colors.error : colors.primary}
+        />
+      </View>
+
       <Text
         style={[
           styles.menuItemLabel,
@@ -567,6 +622,7 @@ function ProfileMenuItem({
       >
         {label}
       </Text>
+
       {showChevron ? (
         <Ionicons
           name="chevron-forward"
@@ -579,11 +635,16 @@ function ProfileMenuItem({
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   styles
+═══════════════════════════════════════════════════════════════ */
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: { paddingHorizontal: spacing.md, gap: spacing.xl },
   headerRow: { paddingVertical: spacing.md },
   heading: { fontSize: 22, fontWeight: "800" },
+
+  /* ── avatar card ── */
   avatarCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -596,9 +657,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
   },
-  avatarWrap: {
-    position: "relative",
-  },
+  avatarWrap: { position: "relative" },
   avatarCircle: {
     width: 72,
     height: 72,
@@ -607,10 +666,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-  },
+  avatarImage: { width: "100%", height: "100%" },
   avatarInitial: { fontSize: 28, fontWeight: "800" },
   cameraBadge: {
     position: "absolute",
@@ -628,6 +684,8 @@ const styles = StyleSheet.create({
   avatarPhone: { fontSize: 14 },
   avatarEmail: { fontSize: 12 },
   editLink: { fontSize: 13, fontWeight: "700", marginTop: 6 },
+
+  /* ── edit form ── */
   editCard: {
     borderWidth: 1,
     borderRadius: radius.xl,
@@ -659,10 +717,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
+  secondaryBtnText: { fontSize: 15, fontWeight: "700" },
   primaryBtn: {
     flex: 1,
     height: 48,
@@ -670,13 +725,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  btnDisabled: {
-    opacity: 0.7,
-  },
+  primaryBtnText: { fontSize: 15, fontWeight: "700" },
+  btnDisabled: { opacity: 0.7 },
+
+  /* ── menu ── */
   menuSection: { gap: spacing.xs },
   menuSectionLabel: {
     fontSize: 12,
@@ -693,8 +745,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.sm,
   },
+  /* NEW — tinted icon container, replaces bare icon */
+  menuIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   menuItemLabel: { flex: 1, fontSize: 15, fontWeight: "600" },
   menuChevron: { marginLeft: "auto" },
+
+  /* ── address sub-screen ── */
   subScreenRoot: { flex: 1 },
   subHeader: {
     flexDirection: "row",

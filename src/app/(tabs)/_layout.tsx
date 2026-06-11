@@ -1,80 +1,3 @@
-// import { Ionicons } from "@expo/vector-icons";
-// import { Tabs } from "expo-router";
-// import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// import { useTheme } from "@/theme";
-
-// export default function TabsLayout() {
-//   const { colors } = useTheme();
-//   const insets = useSafeAreaInsets();
-
-//   return (
-//     <Tabs
-//       screenOptions={{
-//         headerShown: false,
-//         tabBarActiveTintColor: colors.primary,
-//         tabBarInactiveTintColor: colors.textMuted,
-//         tabBarStyle: {
-//           backgroundColor: colors.tabBarBackground,
-//           borderTopWidth: 0,
-//           height: 64 + insets.bottom,
-//           paddingTop: 8,
-//           paddingBottom: Math.max(insets.bottom, 8),
-//         },
-//         tabBarLabelStyle: {
-//           fontSize: 12,
-//           fontWeight: "600",
-//         },
-//       }}
-//     >
-//       <Tabs.Screen
-//         name="home"
-//         options={{
-//           title: "Home",
-//           tabBarIcon: ({ color, size }) => (
-//             <Ionicons name="home-outline" size={size} color={color} />
-//           ),
-//         }}
-//       />
-//       <Tabs.Screen
-//         name="search"
-//         options={{
-//           title: "Search",
-//           tabBarIcon: ({ color, size }) => (
-//             <Ionicons name="search-outline" size={size} color={color} />
-//           ),
-//         }}
-//       />
-//       <Tabs.Screen
-//         name="cart"
-//         options={{
-//           title: "Cart",
-//           tabBarIcon: ({ color, size }) => (
-//             <Ionicons name="cart-outline" size={size} color={color} />
-//           ),
-//         }}
-//       />
-//       <Tabs.Screen
-//         name="orders"
-//         options={{
-//           title: "Orders",
-//           tabBarIcon: ({ color, size }) => (
-//             <Ionicons name="receipt-outline" size={size} color={color} />
-//           ),
-//         }}
-//       />
-//       <Tabs.Screen
-//         name="profile"
-//         options={{
-//           title: "Profile",
-//           tabBarIcon: ({ color, size }) => (
-//             <Ionicons name="person-outline" size={size} color={color} />
-//           ),
-//         }}
-//       />
-//     </Tabs>
-//   );
-// }
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { StyleSheet, View } from "react-native";
@@ -101,7 +24,7 @@ function TabIcon({
     <View
       style={[
         styles.iconWrap,
-        focused && { backgroundColor: activeColor + "26" }, // peach tint
+        focused && { backgroundColor: activeColor + "26" },
       ]}
     >
       <Ionicons
@@ -161,7 +84,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* Cart is reachable from the home header, not shown in the tab bar */}
+      {/* Cart is accessible from the home header, not shown in tab bar */}
       <Tabs.Screen name="cart" options={{ href: null }} />
       <Tabs.Screen
         name="orders"

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -17,8 +16,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { OrderStatus } from "@/features/orders/api/orders.api";
 import { useOrderListQuery } from "@/features/orders/hooks/use-orders";
 import { radius, shadows, spacing, useTheme } from "@/theme";
+import type { OrderListItemDto } from "@/types/api";
 
 const TABS: OrderStatus[] = ["Pending", "Cancelled", "Delivered"];
+
+function formatDate(value?: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function OrdersTab() {
   const { colors } = useTheme();
@@ -27,6 +38,13 @@ export default function OrdersTab() {
 
   const ordersQuery = useOrderListQuery({ status: activeStatus });
   const orders = ordersQuery.data ?? [];
+
+  const statusColor = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "delivered") return colors.success;
+    if (s === "cancelled") return colors.error;
+    return colors.primary;
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -92,9 +110,7 @@ export default function OrdersTab() {
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={(item, i) =>
-            String((item as any).OrderId ?? (item as any).Id ?? i)
-          }
+          keyExtractor={(item) => String(item.OrderId)}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + 90 },
@@ -121,60 +137,61 @@ export default function OrdersTab() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => {
-            // Defensive field reads — see note below; replace with real DTO fields.
-            const o = item as any;
-            const id = o.OrderId ?? o.Id ?? o.OrderNumber;
-            const displayId = o.OrderNumber ?? o.OrderId ?? o.Id ?? "";
-            const date = o.OrderDate ?? o.CreatedAt ?? o.Date ?? "";
-            const name =
-              o.ProductName ??
-              o.Items?.[0]?.ProductName ??
-              o.Items?.[0]?.Name ??
-              "Order items";
-            const price =
-              o.TotalAmount ?? o.Total ?? o.Amount ?? o.GrandTotal ?? 0;
-            const image = o.ImageUrl ?? o.Items?.[0]?.ImageUrl;
-
-            return (
-              <Pressable
-                style={[
-                  styles.card,
-                  { backgroundColor: colors.surface, ...shadows.sm },
-                ]}
-                onPress={() => router.push(`/order/${id}` as any)}
-              >
-                <Image
-                  source={
-                    image
-                      ? { uri: image }
-                      : require("../../assets/images/logo.png")
-                  }
-                  style={styles.cardImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-                <View style={styles.cardInfo}>
+          renderItem={({ item }: { item: OrderListItemDto }) => (
+            <Pressable
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, ...shadows.sm },
+              ]}
+              onPress={() => router.push(`/order/${item.OrderId}` as any)}
+            >
+              <View style={styles.cardTop}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.orderNo, { color: colors.text }]}
+                >
+                  #{item.OrderNo}
+                </Text>
+                <View
+                  style={[
+                    styles.statusChip,
+                    { backgroundColor: statusColor(item.OrderStatus) + "1A" },
+                  ]}
+                >
                   <Text
-                    numberOfLines={1}
-                    style={[styles.orderId, { color: colors.text }]}
+                    style={[
+                      styles.statusText,
+                      { color: statusColor(item.OrderStatus) },
+                    ]}
                   >
-                    Order ID : #{displayId}
-                    {date ? `  |  ${date}` : ""}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.orderName, { color: colors.textSecondary }]}
-                  >
-                    {name}
-                  </Text>
-                  <Text style={[styles.orderPrice, { color: colors.primary }]}>
-                    ₹{Number(price).toFixed(2)}
+                    {item.OrderStatus}
                   </Text>
                 </View>
-              </Pressable>
-            );
-          }}
+              </View>
+
+              <Text style={[styles.orderDate, { color: colors.textSecondary }]}>
+                {formatDate(item.OrderDate)}
+              </Text>
+
+              <View style={styles.cardBottom}>
+                <Text style={[styles.orderAmount, { color: colors.primary }]}>
+                  ₹{Number(item.TotalAmount).toFixed(2)}
+                </Text>
+                {item.TotalDiscount > 0 ? (
+                  <Text
+                    style={[styles.orderDiscount, { color: colors.success }]}
+                  >
+                    Saved ₹{Number(item.TotalDiscount).toFixed(2)}
+                  </Text>
+                ) : null}
+                {item.PaymentStatus ? (
+                  <Text style={[styles.payStatus, { color: colors.textMuted }]}>
+                    {item.PaymentStatus}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          )}
         />
       )}
     </View>
@@ -207,18 +224,34 @@ const styles = StyleSheet.create({
   },
   muted: { fontSize: 14, textAlign: "center" },
   listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
-  card: {
+  card: { borderRadius: radius.xl, padding: spacing.md, gap: 6 },
+  cardTop: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: radius.xl,
-    padding: spacing.sm,
-    columnGap: spacing.sm,
+    justifyContent: "space-between",
   },
-  cardImage: { width: 72, height: 72, borderRadius: radius.lg },
-  cardInfo: { flex: 1, gap: 4 },
-  orderId: { fontSize: 14, fontWeight: "700" },
-  orderName: { fontSize: 13 },
-  orderPrice: { fontSize: 15, fontWeight: "800" },
+  orderNo: {
+    fontSize: 15,
+    fontWeight: "800",
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  statusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  statusText: { fontSize: 12, fontWeight: "700" },
+  orderDate: { fontSize: 13 },
+  cardBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginTop: 2,
+  },
+  orderAmount: { fontSize: 16, fontWeight: "800" },
+  orderDiscount: { fontSize: 12, fontWeight: "600" },
+  payStatus: { fontSize: 12, marginLeft: "auto" },
   retryBtn: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,

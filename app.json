@@ -4,7 +4,10 @@
     "slug": "shreeChhagan",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "icon": "./src/assets/images/shre.png",
     "scheme": "shreechhagan",
     "userInterfaceStyle": "automatic",
@@ -45,7 +48,8 @@
         {
           "color": "#FC8019"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

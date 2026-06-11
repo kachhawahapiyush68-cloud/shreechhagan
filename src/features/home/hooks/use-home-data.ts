@@ -1,48 +1,4 @@
-// // src/features/home/hooks/use-home-data.ts
-// import { useQuery } from "@tanstack/react-query";
-// import { useMemo } from "react";
-
-// import { getCategories, getProducts } from "@/features/home/api/home.api";
-
-// export function useCategoriesQuery() {
-//   return useQuery({
-//     queryKey: ["categories"],
-//     queryFn: getCategories,
-//   });
-// }
-
-// export function useProductsQuery() {
-//   return useQuery({
-//     queryKey: ["products"],
-//     queryFn: getProducts,
-//   });
-// }
-
-// export function useHomeData(selectedCategoryId?: number | null) {
-//   const categoriesQuery = useCategoriesQuery();
-//   const productsQuery = useProductsQuery();
-
-//   const filteredProducts = useMemo(() => {
-//     const products = (productsQuery.data ?? []).filter((item) => item.IsActive);
-
-//     if (!selectedCategoryId) return products;
-//     return products.filter((item) => item.CategoryId === selectedCategoryId);
-//   }, [productsQuery.data, selectedCategoryId]);
-
-//   return {
-//     categories: (categoriesQuery.data ?? []).filter(
-//       (x) => x.IsActive !== false,
-//     ),
-//     products: filteredProducts,
-//     isLoading: categoriesQuery.isLoading || productsQuery.isLoading,
-//     isRefreshing: categoriesQuery.isRefetching || productsQuery.isRefetching,
-//     error: categoriesQuery.error || productsQuery.error,
-//     refetch: async () => {
-//       await Promise.all([categoriesQuery.refetch(), productsQuery.refetch()]);
-//     },
-//   };
-// }
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import {
@@ -66,7 +22,7 @@ export function useCategoriesQuery() {
   return useQuery({
     queryKey: homeQueryKeys.categories,
     queryFn: getCategories,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
   });
 }
 
@@ -74,53 +30,57 @@ export function useProductsQuery() {
   return useQuery({
     queryKey: homeQueryKeys.products,
     queryFn: getProducts,
-    staleTime: 1000 * 60 * 2,
-  });
-}
-
-export function useNavBannersQuery() {
-  return useQuery({
-    queryKey: homeQueryKeys.navBanners,
-    queryFn: getNavBanners,
-    staleTime: 1000 * 60 * 10,
-  });
-}
-
-export function useSpecialProductsQuery(limit = 10) {
-  return useQuery({
-    queryKey: homeQueryKeys.specialProducts(limit),
-    queryFn: () => getSpecialProducts(limit),
-    staleTime: 1000 * 60 * 5,
-  });
-}
-
-export function useTrendingProductsQuery(days = 30, limit = 10) {
-  return useQuery({
-    queryKey: homeQueryKeys.trendingProducts(days, limit),
-    queryFn: () => getTrendingProducts(days, limit),
     staleTime: 1000 * 60 * 5,
   });
 }
 
 export function useHomeData(selectedCategoryId?: number | null) {
-  const categoriesQuery = useCategoriesQuery();
-  const productsQuery = useProductsQuery();
-  const navBannersQuery = useNavBannersQuery();
-  const specialQuery = useSpecialProductsQuery(10);
-  const trendingQuery = useTrendingProductsQuery(30, 10);
+  const [
+    categoriesQuery,
+    productsQuery,
+    navBannersQuery,
+    specialQuery,
+    trendingQuery,
+  ] = useQueries({
+    queries: [
+      {
+        queryKey: homeQueryKeys.categories,
+        queryFn: getCategories,
+        staleTime: 1000 * 60 * 10,
+      },
+      {
+        queryKey: homeQueryKeys.products,
+        queryFn: getProducts,
+        staleTime: 1000 * 60 * 5,
+      },
+      {
+        queryKey: homeQueryKeys.navBanners,
+        queryFn: getNavBanners,
+        staleTime: 1000 * 60 * 10,
+      },
+      {
+        queryKey: homeQueryKeys.specialProducts(10),
+        queryFn: () => getSpecialProducts(10),
+        staleTime: 1000 * 60 * 5,
+      },
+      {
+        queryKey: homeQueryKeys.trendingProducts(30, 10),
+        queryFn: () => getTrendingProducts(30, 10),
+        staleTime: 1000 * 60 * 5,
+      },
+    ],
+  });
 
-  const featuredProducts = useMemo(() => {
-    const all = (productsQuery.data ?? []).filter((p) => p.IsActive);
+  const filteredProducts = useMemo(() => {
+    const all = productsQuery.data ?? [];
     if (!selectedCategoryId) return all;
-    return all.filter((p) => p.CategoryId === selectedCategoryId);
+    return all.filter((product) => product.CategoryId === selectedCategoryId);
   }, [productsQuery.data, selectedCategoryId]);
 
   return {
-    categories: (categoriesQuery.data ?? []).filter(
-      (c) => c.IsActive !== false,
-    ),
-    featuredProducts,
-    products: featuredProducts,
+    categories: categoriesQuery.data ?? [],
+    products: productsQuery.data ?? [],
+    featuredProducts: filteredProducts,
     navBanners: navBannersQuery.data ?? [],
     specialProducts: specialQuery.data ?? [],
     trendingProducts: trendingQuery.data ?? [],
@@ -131,9 +91,15 @@ export function useHomeData(selectedCategoryId?: number | null) {
     isRefreshing:
       categoriesQuery.isRefetching ||
       productsQuery.isRefetching ||
-      navBannersQuery.isRefetching,
+      navBannersQuery.isRefetching ||
+      specialQuery.isRefetching ||
+      trendingQuery.isRefetching,
     error:
-      categoriesQuery.error || productsQuery.error || navBannersQuery.error,
+      categoriesQuery.error ||
+      productsQuery.error ||
+      navBannersQuery.error ||
+      specialQuery.error ||
+      trendingQuery.error,
     refetch: async () => {
       await Promise.all([
         categoriesQuery.refetch(),

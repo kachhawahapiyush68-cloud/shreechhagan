@@ -1,45 +1,8 @@
-// // src/lib/push.ts
-// import * as Notifications from "expo-notifications";
-// import * as Device from "expo-device";
-// import { Platform } from "react-native";
-
-// let cachedToken: string | null = null;
-
-// /**
-//  * Returns the native FCM registration token on Android
-//  * (the value your backend expects in `fcm_token`).
-//  * Returns null on emulators without Play Services or if permission is denied.
-//  */
-// export async function getFcmToken(): Promise<string | null> {
-//   if (cachedToken) return cachedToken;
-//   if (!Device.isDevice) return null;
-
-//   if (Platform.OS === "android") {
-//     await Notifications.setNotificationChannelAsync("default", {
-//       name: "Default",
-//       importance: Notifications.AndroidImportance.DEFAULT,
-//     });
-//   }
-
-//   const existing = await Notifications.getPermissionsAsync();
-//   let status = existing.status;
-//   if (status !== "granted") {
-//     status = (await Notifications.requestPermissionsAsync()).status;
-//   }
-//   if (status !== "granted") return null;
-
-//   try {
-//     const { data } = await Notifications.getDevicePushTokenAsync();
-//     cachedToken = data as string;
-//     return cachedToken;
-//   } catch {
-//     return null;
-//   }
-// }
-// src/lib/push.ts
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+
+const ANDROID_CHANNEL_ID = "main-alerts";
 
 let cachedToken: string | null = null;
 
@@ -47,20 +10,26 @@ let cachedToken: string | null = null;
 export async function configurePushNotifications(): Promise<boolean> {
   try {
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "Default",
-        importance: Notifications.AndroidImportance.MAX, // heads-up banners
+      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+        name: "Main Alerts",
+        importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#FC8019",
-        sound: "default",
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: false,
+        enableVibrate: true,
+        showBadge: true,
       });
     }
 
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;
+
     if (status !== "granted") {
       status = (await Notifications.requestPermissionsAsync()).status;
     }
+
     return status === "granted";
   } catch (err) {
     if (__DEV__) console.warn("[push] configure failed:", err);
@@ -74,7 +43,7 @@ export async function configurePushNotifications(): Promise<boolean> {
  */
 export async function getFcmToken(): Promise<string | null> {
   if (cachedToken) return cachedToken;
-  if (!Device.isDevice) return null; // emulator can't get a real token
+  if (!Device.isDevice) return null;
 
   try {
     const granted = await configurePushNotifications();
@@ -82,10 +51,14 @@ export async function getFcmToken(): Promise<string | null> {
 
     const { data } = await Notifications.getDevicePushTokenAsync();
     cachedToken = typeof data === "string" ? data : String(data);
-    if (__DEV__) console.log("[push] FCM token →", cachedToken);
+
+    if (__DEV__) console.log("[push] native push token →", cachedToken);
+
     return cachedToken;
   } catch (err) {
     if (__DEV__) console.warn("[push] getFcmToken failed:", err);
     return null;
   }
 }
+
+export { ANDROID_CHANNEL_ID };

@@ -130,9 +130,8 @@ async function requestJson<TResponse>(
   }
 }
 
-async function requestFormData<TResponse>(
+async function requestGet<TResponse>(
   url: string,
-  formData: FormData,
   options?: {
     requireAuth?: boolean;
     headers?: Record<string, string>;
@@ -146,13 +145,12 @@ async function requestFormData<TResponse>(
 
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method: "GET",
       headers: {
         Accept: "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options?.headers ?? {}),
       },
-      body: formData,
       signal: controller.signal,
     });
 
@@ -214,19 +212,26 @@ export async function postApiPath<TResponse, TBody = Record<string, unknown>>(
   return requestJson<TResponse>(`${ENV.API_BASE_URL}${path}`, body, options);
 }
 
-export async function postMultipartPath<TResponse>(
+export async function getApiPath<TResponse>(
   path: string,
-  formData: FormData,
+  params?: Record<string, string | number | boolean | undefined>,
   options?: {
     requireAuth?: boolean;
     headers?: Record<string, string>;
   },
 ): Promise<ApiEnvelope<TResponse>> {
-  return requestFormData<TResponse>(
-    `${ENV.API_BASE_URL}${path}`,
-    formData,
-    options,
-  );
+  const search = new URLSearchParams();
+
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      search.append(key, String(value));
+    }
+  });
+
+  const query = search.toString();
+  const url = `${ENV.API_BASE_URL}${path}${query ? `?${query}` : ""}`;
+
+  return requestGet<TResponse>(url, options);
 }
 
 export async function postMaster<

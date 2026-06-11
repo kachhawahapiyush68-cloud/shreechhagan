@@ -14,6 +14,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  getDisplayPrice,
+  getPrimaryProductImage,
+} from "@/features/home/api/home.api";
 import { useProductsQuery } from "@/features/home/hooks/use-home-data";
 import { radius, shadows, spacing, useTheme } from "@/theme";
 import type { ProductDto } from "@/types/api";
@@ -32,7 +36,10 @@ export default function CategoryListingRoute() {
   const { data, isLoading, error, refetch } = useProductsQuery();
 
   const products = useMemo(
-    () => (data ?? []).filter((p) => p.IsActive && p.CategoryId === categoryId),
+    () =>
+      (data ?? []).filter(
+        (p) => p.IsActive !== false && p.CategoryId === categoryId,
+      ),
     [data, categoryId],
   );
 
@@ -55,6 +62,7 @@ export default function CategoryListingRoute() {
         >
           {name ?? "Products"}
         </Text>
+        <View style={{ width: 24 }} />
       </View>
 
       {isLoading ? (
@@ -97,9 +105,12 @@ export default function CategoryListingRoute() {
             </View>
           }
           renderItem={({ item }: { item: ProductDto }) => {
+            const imageUrl = getPrimaryProductImage(item);
+            const displayPrice = getDisplayPrice(item);
             const rating = (item as any).Rating ?? (item as any).AvgRating;
             const reviews =
               (item as any).ReviewCount ?? (item as any).TotalReviews;
+
             return (
               <Pressable
                 style={[
@@ -110,9 +121,9 @@ export default function CategoryListingRoute() {
               >
                 <Image
                   source={
-                    item.ImageUrl
-                      ? { uri: item.ImageUrl }
-                      : require("../../assets/images/logo.png")
+                    imageUrl
+                      ? { uri: imageUrl }
+                      : require("../../assets/images/sweet1.png")
                   }
                   style={styles.cardImage}
                   contentFit="cover"
@@ -120,14 +131,15 @@ export default function CategoryListingRoute() {
                 />
                 <View style={styles.cardInfo}>
                   <Text
-                    numberOfLines={1}
+                    numberOfLines={2}
                     style={[styles.cardName, { color: colors.text }]}
                   >
                     {item.ProductName}
                   </Text>
+
                   {rating != null ? (
                     <View style={styles.ratingRow}>
-                      <Ionicons name="star" size={13} color={colors.warning} />
+                      <Ionicons name="star" size={12} color={colors.warning} />
                       <Text
                         style={[
                           styles.ratingText,
@@ -135,12 +147,13 @@ export default function CategoryListingRoute() {
                         ]}
                       >
                         {rating}
-                        {reviews != null ? ` | ${reviews} review` : ""}
+                        {reviews != null ? ` (${reviews})` : ""}
                       </Text>
                     </View>
                   ) : null}
+
                   <Text style={[styles.cardPrice, { color: colors.primary }]}>
-                    ₹{item.Price.toFixed(2)}
+                    ₹{displayPrice.toFixed(2)}
                   </Text>
                 </View>
               </Pressable>
@@ -157,33 +170,50 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    columnGap: spacing.sm,
+    justifyContent: "space-between",
     paddingHorizontal: H_PAD,
     paddingVertical: spacing.md,
   },
   back: { padding: 2 },
-  headerTitle: { fontSize: 20, fontWeight: "800", flex: 1 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    paddingTop: spacing["4xl"],
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
   },
   muted: { fontSize: 14, textAlign: "center" },
-  listContent: { paddingHorizontal: H_PAD, paddingBottom: spacing["4xl"] },
+  listContent: {
+    paddingHorizontal: H_PAD,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
   row: { gap: GAP, marginBottom: GAP },
-  card: { width: CARD_W, borderRadius: radius.xl, overflow: "hidden" },
-  cardImage: { width: "100%", height: 130 },
-  cardInfo: { padding: spacing.sm, gap: 4 },
-  cardName: { fontSize: 14, fontWeight: "700" },
-  ratingRow: { flexDirection: "row", alignItems: "center", columnGap: 4 },
+  card: {
+    width: CARD_W,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+  },
+  cardImage: { width: "100%", height: 140 },
+  cardInfo: {
+    padding: spacing.sm,
+    gap: 4,
+  },
+  cardName: { fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  ratingRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   ratingText: { fontSize: 12 },
-  cardPrice: { fontSize: 15, fontWeight: "800" },
+  cardPrice: { fontSize: 15, fontWeight: "800", marginTop: 2 },
   retryBtn: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
+    borderRadius: 999,
     borderWidth: 1.5,
     marginTop: spacing.sm,
   },

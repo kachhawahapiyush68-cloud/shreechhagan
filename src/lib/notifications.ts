@@ -1,34 +1,33 @@
-// src/lib/notifications.ts
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
-// Foreground display handler. WITHOUT this, a notification that arrives while
-// the app is OPEN is received but never shown (no banner/sound).
+const ANDROID_CHANNEL_ID = "main-alerts";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    // Expo SDK 51+ field names:
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-    // If you're on SDK 50 or older, delete the two above and use:
-    // shouldShowAlert: true,
   }),
 });
 
 /** Wire up received + tapped listeners. Returns an unsubscribe fn. */
 export function registerNotificationListeners() {
   const receivedSub = Notifications.addNotificationReceivedListener((n) => {
-    if (__DEV__)
+    if (__DEV__) {
       console.log("NOTIFICATION RECEIVED →", JSON.stringify(n.request.content));
+    }
   });
 
   const responseSub = Notifications.addNotificationResponseReceivedListener(
     (r) => {
-      if (__DEV__)
+      if (__DEV__) {
         console.log(
           "NOTIFICATION TAPPED →",
           JSON.stringify(r.notification.request.content),
         );
+      }
       // Optional: navigate based on r.notification.request.content.data
     },
   );
@@ -41,15 +40,25 @@ export function registerNotificationListeners() {
 
 /**
  * LOCAL test — proves the app can DISPLAY a notification.
- * Needs NO FCM, NO backend, NO Firebase. Works on emulator too.
+ * Needs NO FCM, NO backend, NO Firebase.
  */
 export async function sendLocalTestNotification() {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: "ShreeChhagan test 🛵",
       body: "If you see this, notification display is working.",
-      sound: "default",
+      sound: true,
+      ...(Platform.OS === "android"
+        ? { priority: Notifications.AndroidNotificationPriority.HIGH }
+        : {}),
     },
-    trigger: null, // fire immediately
+    trigger:
+      Platform.OS === "android"
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 1,
+            channelId: ANDROID_CHANNEL_ID,
+          }
+        : null,
   });
 }

@@ -1,4 +1,3 @@
-// src/features/cart/store/cart.store.ts
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -6,22 +5,36 @@ import { zustandStorage } from "@/lib/mmkv";
 
 export type CartItem = {
   productId: number;
-  name: string;
+  productPriceId: number;
+  productName: string;
+  unitName: string;
   price: number;
   qty: number;
   imageUrl?: string | null;
+  taxPercent?: number;
 };
+
+type AddCartItemInput = Omit<CartItem, "qty">;
 
 type CartState = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "qty">) => void;
-  removeItem: (productId: number) => void;
-  increaseQty: (productId: number) => void;
-  decreaseQty: (productId: number) => void;
+  addItem: (item: AddCartItemInput) => void;
+  removeItem: (productId: number, productPriceId: number) => void;
+  increaseQty: (productId: number, productPriceId: number) => void;
+  decreaseQty: (productId: number, productPriceId: number) => void;
   clearCart: () => void;
+  getItemQty: (productId: number, productPriceId: number) => number;
   getTotalAmount: () => number;
   getTotalItems: () => number;
 };
+
+function isSameCartLine(
+  item: Pick<CartItem, "productId" | "productPriceId">,
+  productId: number,
+  productPriceId: number,
+) {
+  return item.productId === productId && item.productPriceId === productPriceId;
+}
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -30,14 +43,16 @@ export const useCartStore = create<CartState>()(
 
       addItem: (item) =>
         set((state) => {
-          const existing = state.items.find(
-            (x) => x.productId === item.productId,
+          const existing = state.items.find((x) =>
+            isSameCartLine(x, item.productId, item.productPriceId),
           );
 
           if (existing) {
             return {
               items: state.items.map((x) =>
-                x.productId === item.productId ? { ...x, qty: x.qty + 1 } : x,
+                isSameCartLine(x, item.productId, item.productPriceId)
+                  ? { ...x, qty: x.qty + 1 }
+                  : x,
               ),
             };
           }
@@ -47,28 +62,38 @@ export const useCartStore = create<CartState>()(
           };
         }),
 
-      removeItem: (productId) =>
+      removeItem: (productId, productPriceId) =>
         set((state) => ({
-          items: state.items.filter((x) => x.productId !== productId),
-        })),
-
-      increaseQty: (productId) =>
-        set((state) => ({
-          items: state.items.map((x) =>
-            x.productId === productId ? { ...x, qty: x.qty + 1 } : x,
+          items: state.items.filter(
+            (x) => !isSameCartLine(x, productId, productPriceId),
           ),
         })),
 
-      decreaseQty: (productId) =>
+      increaseQty: (productId, productPriceId) =>
+        set((state) => ({
+          items: state.items.map((x) =>
+            isSameCartLine(x, productId, productPriceId)
+              ? { ...x, qty: x.qty + 1 }
+              : x,
+          ),
+        })),
+
+      decreaseQty: (productId, productPriceId) =>
         set((state) => ({
           items: state.items
             .map((x) =>
-              x.productId === productId ? { ...x, qty: x.qty - 1 } : x,
+              isSameCartLine(x, productId, productPriceId)
+                ? { ...x, qty: x.qty - 1 }
+                : x,
             )
             .filter((x) => x.qty > 0),
         })),
 
       clearCart: () => set({ items: [] }),
+
+      getItemQty: (productId, productPriceId) =>
+        get().items.find((x) => isSameCartLine(x, productId, productPriceId))
+          ?.qty ?? 0,
 
       getTotalAmount: () =>
         get().items.reduce((sum, item) => sum + item.price * item.qty, 0),

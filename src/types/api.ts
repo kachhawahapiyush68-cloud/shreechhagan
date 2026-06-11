@@ -27,8 +27,27 @@ export type ApiRequestAction =
 export type CategoryDto = {
   CategoryId: number;
   CategoryName: string;
+  PhotoPath?: string | null;
+  PhotoUrl?: string | null;
+  PhotoName?: string | null;
+  DisplayOrder?: number;
   IsActive?: boolean;
-  ImageUrl?: string | null;
+};
+
+export type ProductImageDto = {
+  ProductImageId: number;
+  ImagePath: string;
+  ImageUrl: string;
+  ImageName?: string | null;
+  DisplayOrder: number;
+};
+
+export type ProductPricingOptionDto = {
+  ProductPriceId: number;
+  UnitName: string;
+  Price: number;
+  IsActive: boolean;
+  Remarks?: string | null;
 };
 
 export type ProductDto = {
@@ -41,10 +60,22 @@ export type ProductDto = {
   IsActive: boolean;
   Description?: string | null;
   ImageUrl?: string | null;
+  ImageName?: string | null;
+  VegNonVeg?: boolean;
+  productcode?: string;
+  isfavorite?: boolean;
+  IsSpecial?: boolean;
+  stoporder?: boolean;
+  unit?: string | null;
+  hsncode?: string | null;
   Rating?: number | null;
   AvgRating?: number | null;
   ReviewCount?: number | null;
   TotalReviews?: number | null;
+  PricingOptionsXml?: string | null;
+  ImagesXml?: string | null;
+  ProductImages?: ProductImageDto[];
+  PricingOptions?: ProductPricingOptionDto[];
 };
 
 export type SplashBannerDto = {
@@ -134,11 +165,11 @@ export type AddressDto = {
   AddressType: string;
   FullAddress: string;
   City: string;
-  State?: string;
-  PinCode?: string;
-  Landmark?: string;
-  Latitude?: number;
-  Longitude?: number;
+  State?: string | null;
+  PinCode?: string | null;
+  Landmark?: string | null;
+  Latitude?: number | null;
+  Longitude?: number | null;
   IsDefault: boolean;
   IsActive: boolean;
 };
@@ -165,7 +196,85 @@ export type FavouriteMutationResultDto = {
   Success: number;
 };
 
+/* ----------------------------- Coupons ----------------------------- */
+
+export type CouponValidationDto = {
+  CouponId: number;
+  CouponCode?: string;
+  DiscountType: "P" | "F" | string;
+  DiscountValue: number;
+  DiscountAmount: number;
+  IsValid?: boolean;
+  Success?: number;
+  Message?: string;
+};
+
+/* ------------------------------ Orders ----------------------------- */
+
 export type OrderDto = Record<string, unknown>;
+
+export type OrderListItemDto = {
+  OrderId: number;
+  OrderNo: string;
+  OrderDate: string;
+  OrderStatus: string;
+  TotalAmount: number;
+  TotalDiscount: number;
+  PaymentStatus?: string | null;
+  DeliveryManName?: string | null;
+};
+
+export type OrderDetailItemDto = {
+  Id: number;
+  ItemId: number;
+  ProductName: string;
+  Qty: number;
+  Rate: number;
+  Remark?: string | null;
+};
+
+export type OrderDetailDto = {
+  Order: {
+    OrderId: number;
+    OrderNo: string;
+    TotalAmount: number;
+    OrderStatus: string;
+    [key: string]: unknown;
+  };
+  Items: OrderDetailItemDto[];
+};
+
+export type PlaceOrderItem = {
+  ItemId: number;
+  Qty: number;
+  Rate: number;
+  Remark?: string;
+};
+
+export type PlaceOrderResultDto = {
+  OrderId: number;
+  OrderNo: string;
+  TotalAmount: number;
+  TotalDiscount: number;
+  Success: number;
+  Message?: string;
+};
+
+export type OrderActionResultDto = {
+  Success: number;
+  Message?: string;
+};
+
+/* --------------------------- Order history (bills) ----------------- */
+
+export type OrderHistoryBillDto = {
+  BillId: number;
+  BillNumber: string;
+  GrandTotal: number;
+  BillDate: string;
+};
+
+/* ------------------------------- Auth ------------------------------ */
 
 export type AuthSessionUser = {
   id: string;
@@ -183,20 +292,23 @@ export type AuthSession = {
   accessToken: string;
 };
 
-export function getCustomerEmail(
-  dto: Partial<
-    | CustomerLoginDto
-    | OtpVerifyDto
-    | RegisterCustomerDto
-    | UpdateCustomerProfileDto
-  >,
-) {
-  if ("CustomerEmail" in dto && typeof dto.CustomerEmail === "string") {
-    return dto.CustomerEmail;
+/* ----------------------------- Helpers ----------------------------- */
+
+type AnyCustomerDto =
+  | CustomerLoginDto
+  | OtpVerifyDto
+  | RegisterCustomerDto
+  | UpdateCustomerProfileDto;
+
+export function getCustomerEmail(dto: Partial<AnyCustomerDto>): string {
+  const record = dto as Record<string, unknown>;
+
+  if (typeof record.CustomerEmail === "string") {
+    return record.CustomerEmail;
   }
 
-  if ("customeremail" in dto && typeof dto.customeremail === "string") {
-    return dto.customeremail;
+  if (typeof record.customeremail === "string") {
+    return record.customeremail;
   }
 
   return "";
@@ -204,6 +316,40 @@ export function getCustomerEmail(
 
 export function getCustomerToken(
   dto: Partial<CustomerLoginDto & OtpVerifyDto>,
-) {
+): string {
   return dto.Token || dto.token || "";
 }
+
+/* --------------------------- Notifications ------------------------- */
+
+export type NotificationDto = {
+  NotificationId: number;
+  CustomerId?: number | null;
+  Title: string;
+  Body: string;
+  IsRead: boolean | number;
+  SentAt: string;
+};
+
+export type NotificationReadResultDto = {
+  Success: number;
+  Message?: string;
+};
+
+/* ---------------------------- App Content -------------------------- */
+
+export type ContentSlug = "privacy" | "help" | "terms";
+
+export type AppContentDto = {
+  Id: number;
+  Title: string;
+  HtmlContent: string;
+  IsActive: boolean;
+  UpdatedAt: string;
+};
+
+export type HelpContentDto = AppContentDto & {
+  Phone: string | null;
+  Email: string | null;
+  WhatsAppNo: string | null;
+};
